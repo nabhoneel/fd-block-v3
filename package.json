@@ -15,8 +15,18 @@
     "clean": "gatsby clean"
   },
   "dependencies": {
-    "gatsby": "^4.20.0",
+    "flowbite": "^1.5.1",
+    "flowbite-react": "^0.1.5",
+    "gatsby": "^5.0.1",
+    "gatsby-plugin-manifest": "^4.20.0",
     "react": "^18.1.0",
-    "react-dom": "^18.1.0"
+    "react-dom": "^18.1.0",
+    "react-slick": "^0.29.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.8",
+    "gatsby-plugin-postcss": "^5.20.0",
+    "postcss": "^8.4.16",
+    "tailwindcss": "^3.1.8"
   }
 }
