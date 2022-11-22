@@ -1,0 +1,13 @@
+.react-daterange-picker__calendar {
+    width: auto !important ;
+    border-radius: 2rem;
+}
+
+.react-daterange-picker--open {
+    display: flex;
+    flex-direction: column;
+}
+
+.react-daterange-picker__calendar--open {
+    position: relative !important ;
+}

@@ -15,13 +15,18 @@
     "clean": "gatsby clean"
   },
   "dependencies": {
+    "@wojtekmaj/react-daterange-picker": "^4.1.0",
     "flowbite": "^1.5.1",
     "flowbite-react": "^0.1.5",
-    "gatsby": "^5.0.1",
+    "gatsby": "^4.20.0",
     "gatsby-plugin-manifest": "^4.20.0",
     "react": "^18.1.0",
+    "react-date-picker": "^9.1.0",
     "react-dom": "^18.1.0",
-    "react-slick": "^0.29.0"
+    "react-helmet": "^6.1.0",
+    "react-slick": "^0.29.0",
+    "swiper": "^8.4.5",
+    "tailwind-datepicker-react": "^1.2.3"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.8",

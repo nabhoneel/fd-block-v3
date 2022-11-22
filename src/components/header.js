@@ -1,6 +1,6 @@
 import React from "react";
 import { useLocation } from "@reach/router";
-import { Navbar, Dropdown, Avatar, Button } from "flowbite-react";
+import { Navbar, Button } from "flowbite-react";
 import logo from "../assets/images/fdblock.png";
 
 // Define the URLs and their page titles below

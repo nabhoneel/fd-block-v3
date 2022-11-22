@@ -1,14 +1,13 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
     content: [
-        "./src/pages/**/*.{js,jsx,ts,tsx}",
-        "./src/components/**/*.{js,jsx,ts,tsx}",
-        "node_modules/flowbite-react/**/*.{js,jsx,ts,tsx}"
+        "src/pages/**/*.{js,jsx,ts,tsx}",
+        "src/components/**/*.{js,jsx,ts,tsx}",
+        "node_modules/flowbite-react/**/*.{js,jsx,ts,tsx}",
+        "node_modules/tailwind-datepicker-react/dist/**/*.js",
     ],
     theme: {
         extend: {},
     },
-    plugins: [
-        require('flowbite/plugin')
-    ],
-}
+    plugins: [require("flowbite/plugin")],
+};
