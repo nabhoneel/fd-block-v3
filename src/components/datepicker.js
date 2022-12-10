@@ -1,11 +1,8 @@
-import React, { useState } from "react";
-// import DatePicker from "react-date-picker";
+import React from "react";
 import DateRangePicker from "@wojtekmaj/react-daterange-picker";
 import "./datepicker.css";
 
-export default function Datepicker() {
-    const [value, onChange] = useState([new Date(), new Date()]);
-
+export default function Datepicker({ onChange, value }) {
     return (
         <div>
             <DateRangePicker

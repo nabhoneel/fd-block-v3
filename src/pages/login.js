@@ -3,20 +3,9 @@
 import React, { useState, useContext } from "react";
 import { navigate } from "gatsby";
 import { app } from "../config/firebase";
-import {
-    getAuth,
-    RecaptchaVerifier,
-    signInWithPhoneNumber,
-} from "firebase/auth";
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 
-import {
-    Button,
-    Card,
-    Label,
-    TextInput,
-    Checkbox,
-    Spinner,
-} from "flowbite-react";
+import { Button, Card, Label, TextInput, Checkbox, Spinner } from "flowbite-react";
 
 import Layout from "../components/layout";
 import { StdContext, StdContextConsumer } from "../context/StdContext";
@@ -68,11 +57,7 @@ export default function IndexPage() {
              * requests that Firebase Authentication send an SMS message containing a verification code to the user's phone.
              */
             try {
-                const sign_in = await signInWithPhoneNumber(
-                    auth,
-                    phone_number,
-                    recaptcha_verifier
-                );
+                const sign_in = await signInWithPhoneNumber(auth, phone_number, recaptcha_verifier);
 
                 SetConfirmationResult(sign_in);
                 SetStatus({ ...status, enable_otp_field: true });
@@ -84,10 +69,7 @@ export default function IndexPage() {
 
     const HandleSubmitOtp = async event => {
         console.info("HandleSubmitOtp");
-        console.assert(
-            confirmation_result,
-            "Confirmation object cannot be null"
-        );
+        console.assert(confirmation_result, "Confirmation object cannot be null");
 
         try {
             const creds = await confirmation_result.confirm(otp);
@@ -107,82 +89,75 @@ export default function IndexPage() {
             </Layout>
         );
     } else if (context.user_id === "") {
-        console.log("Rendering login");
         // Render the login form only if the user is signed out
         return (
             <Layout>
-                <div className="max-w-sm">
-                    <Card>
-                        <form className="flex flex-col gap-4">
-                            <div>
-                                <div className="mb-2 block">
-                                    <Label
-                                        htmlFor="phone-number"
-                                        value="Registered phone number"
+                <div className="flex justify-center align-center pt-10">
+                    <div className="w-auto max-w-lg">
+                        <Card>
+                            <h2 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">Login</h2>
+                            <form className="flex flex-col gap-5">
+                                <div>
+                                    <div className="mb-2 block">
+                                        <Label htmlFor="phone-number" value="Phone number" />
+                                    </div>
+                                    <StdContextConsumer>
+                                        {global_state => (
+                                            <TextInput
+                                                id="phone-number"
+                                                type="tel"
+                                                placeholder="(+91) xxxxx-xxxxx"
+                                                required={true}
+                                                disabled={status.enable_otp_field}
+                                                value={phone_number}
+                                                onChange={event => {
+                                                    SetPhoneNumber(event.target.value);
+                                                    // Sort of a semaphore for blocking user-related operations during this flow
+                                                    global_state.SetUserSigningIn(true);
+                                                }}
+                                            />
+                                        )}
+                                    </StdContextConsumer>
+                                </div>
+                                <div>
+                                    <div className="mb-2 block">
+                                        <Label htmlFor="otp" value="OTP" />
+                                    </div>
+                                    <TextInput
+                                        id="otp"
+                                        type="number"
+                                        required={true}
+                                        disabled={!status.enable_otp_field}
+                                        value={otp}
+                                        onChange={event => {
+                                            SetOtp(event.target.value);
+                                        }}
                                     />
                                 </div>
-                                <TextInput
-                                    id="phone-number"
-                                    type="tel"
-                                    placeholder="(+91) xxxxx-xxxxx"
-                                    required={true}
-                                    disabled={status.enable_otp_field}
-                                    value={phone_number}
-                                    onChange={event =>
-                                        SetPhoneNumber(event.target.value)
-                                    }
-                                />
-                            </div>
-                            <div>
-                                <div className="mb-2 block">
-                                    <Label htmlFor="otp" value="OTP" />
+                                <div className="flex items-center gap-2">
+                                    <Checkbox id="remember" />
+                                    <Label htmlFor="remember">Remember me</Label>
                                 </div>
-                                <StdContextConsumer>
-                                    {global_state => (
-                                        <TextInput
-                                            id="otp"
-                                            type="number"
-                                            required={true}
-                                            disabled={!status.enable_otp_field}
-                                            value={otp}
-                                            onChange={event => {
-                                                SetOtp(event.target.value);
-                                                // Sort of a semaphore for blocking user-related operations during this flow
-                                                global_state.SetUserSigningIn(
-                                                    true
-                                                );
-                                            }}
-                                        />
-                                    )}
-                                </StdContextConsumer>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Checkbox id="remember" />
-                                <Label htmlFor="remember">Remember me</Label>
-                            </div>
-                            <Button
-                                onClick={HandleGenerateOtp}
-                                style={{
-                                    display: status.enable_otp_field
-                                        ? "none"
-                                        : "block",
-                                }}
-                            >
-                                Generate OTP
-                            </Button>
-                            <Button
-                                onClick={HandleSubmitOtp}
-                                style={{
-                                    display: status.enable_otp_field
-                                        ? "block"
-                                        : "none",
-                                }}
-                            >
-                                Submit OTP
-                            </Button>
-                            <div id="recaptcha-container" />
-                        </form>
-                    </Card>
+                                <Button
+                                    onClick={HandleGenerateOtp}
+                                    style={{
+                                        display: status.enable_otp_field ? "none" : "block",
+                                    }}
+                                >
+                                    Generate OTP
+                                </Button>
+                                <Button
+                                    onClick={HandleSubmitOtp}
+                                    style={{
+                                        display: status.enable_otp_field ? "block" : "none",
+                                    }}
+                                >
+                                    Submit OTP
+                                </Button>
+                                <div id="recaptcha-container" />
+                            </form>
+                        </Card>
+                    </div>
                 </div>
             </Layout>
         );
