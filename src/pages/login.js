@@ -21,9 +21,8 @@ export default function IndexPage() {
         enable_otp_field: false,
     });
 
-    const context = useContext(StdContext);
-    if (context.user_id?.length > 0) {
-        // The user_id will be populated only when any user is signed in ; in that case, it will not be null or ""
+    const { NoData, SignedIn, SetUserSigningIn } = useContext(StdContext);
+    if (SignedIn()) {
         navigate("/");
     }
 
@@ -74,21 +73,23 @@ export default function IndexPage() {
         try {
             const creds = await confirmation_result.confirm(otp);
             if (creds.user?.phoneNumber === phone_number) {
-                context.SetUserSigningIn(false);
+                SetUserSigningIn(false);
             }
         } catch (err) {
             console.error("Could not confirm OTP");
         }
     };
 
-    if (context.user_id === null) {
+    if (NoData()) {
         // When the user's logged in state is yet to be determined, show a loading animation
         return (
             <Layout>
                 <Spinner aria-label="Extra large spinner example" size="xl" />
             </Layout>
         );
-    } else if (context.user_id === "") {
+    }
+
+    if (!SignedIn()) {
         // Render the login form only if the user is signed out
         return (
             <Layout>

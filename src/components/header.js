@@ -1,12 +1,11 @@
+// Front end
 import React, { useContext } from "react";
 import { useLocation } from "@reach/router";
 import { Link } from "gatsby";
-import { Navbar, Button, Spinner, Dropdown } from "flowbite-react";
-import { SlUser } from "react-icons/sl";
+import { Navbar, Spinner, Dropdown } from "flowbite-react";
+import { TfiUser } from "react-icons/tfi";
 
-import { getAuth } from "firebase/auth";
-
-import { app } from "../config/firebase";
+// Internal
 import { StdContext } from "../context/StdContext";
 import fd_block_logo from "../assets/images/fdblock.png";
 
@@ -33,8 +32,7 @@ const Header = () => {
         }
     });
 
-    const { user_id, user_phone_number } = useContext(StdContext);
-    const auth = getAuth(app);
+    const { NoData, SignedIn, SignOut, user_phone_number, user_data } = useContext(StdContext);
     return (
         <Navbar fluid={true} rounded={true}>
             <Navbar.Brand href="/">
@@ -42,13 +40,13 @@ const Header = () => {
                 <span className="self-center whitespace-nowrap text-xl font-semibold dark:text-white">fdblock.org</span>
             </Navbar.Brand>
             <div className="flex md:order-2">
-                {user_id === null ? (
+                {NoData() ? (
                     <Spinner aria-label="Default status example" />
-                ) : user_id?.length > 0 ? (
+                ) : SignedIn() ? (
                     <div className="flex md:order-2">
-                        <Dropdown arrowIcon={false} inline={true} label={<SlUser className="text-2xl" />}>
+                        <Dropdown arrowIcon={false} inline={true} label={<TfiUser className="text-2xl" />}>
                             <Dropdown.Header>
-                                <span className="block text-sm">New User</span>
+                                <span className="block text-sm">{user_data?.name}</span>
                                 <span className="block truncate text-sm font-medium">{user_phone_number}</span>
                             </Dropdown.Header>
                             <Dropdown.Item>
@@ -61,7 +59,7 @@ const Header = () => {
                                 <Link to="/dashboard/block-dir">Block Directory</Link>
                             </Dropdown.Item>
                             <Dropdown.Divider />
-                            <Dropdown.Item onClick={e => auth.signOut()}>Sign out</Dropdown.Item>
+                            <Dropdown.Item onClick={e => SignOut()}>Sign out</Dropdown.Item>
                         </Dropdown>
                         <Navbar.Toggle />
                     </div>
