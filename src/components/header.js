@@ -33,6 +33,7 @@ const Header = () => {
     });
 
     const { NoData, SignedIn, SignOut, user_phone_number, user_data } = useContext(StdContext);
+
     return (
         <Navbar fluid={true} rounded={true}>
             <Navbar.Brand href="/">
