@@ -15,7 +15,6 @@
     "clean": "gatsby clean"
   },
   "dependencies": {
-    "@wojtekmaj/react-daterange-picker": "^4.1.0",
     "dotenv": "^16.0.3",
     "firebase": "^9.14.0",
     "flowbite": "^1.5.1",
@@ -23,13 +22,11 @@
     "gatsby": "^4.20.0",
     "gatsby-plugin-manifest": "^4.20.0",
     "react": "^18.1.0",
-    "react-date-picker": "^9.1.0",
+    "react-date-range": "^1.4.0",
     "react-dom": "^18.1.0",
     "react-helmet": "^6.1.0",
     "react-icons": "^4.7.1",
-    "react-slick": "^0.29.0",
-    "swiper": "^8.4.5",
-    "tailwind-datepicker-react": "^1.2.3"
+    "swiper": "^8.4.5"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.8",

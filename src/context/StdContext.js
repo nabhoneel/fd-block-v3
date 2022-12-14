@@ -37,11 +37,10 @@ export const StdContextProvider = ({ children }) => {
             SetUserPhoneNumber(user.phoneNumber);
             SetUserId(user.uid);
             if (user_data !== null) {
-                // Obtain the cached data in local storage (if available) and set it on StdContext
-                console.log(user_data);
                 return;
             }
 
+            // If the user's data is NOT cached in the local storage, we need to fetch it and set it
             const db = getFirestore(app);
             const users_ref = collection(db, "users");
             const q = query(users_ref, where("phoneNumber", "==", user_phone_number));
@@ -49,7 +48,7 @@ export const StdContextProvider = ({ children }) => {
             let replace_doc_id = null;
             let existing_doc_data = null;
             snapshots.forEach(doc => {
-                console.warn("querying data");
+                console.warn("Querying data");
                 SetUserDataFromFirebase(doc.data());
                 if (doc.id === user_id) return;
 
@@ -61,6 +60,7 @@ export const StdContextProvider = ({ children }) => {
                 existing_doc_data = doc.data();
             });
 
+            // This will be a one time operation for preloaded user info
             if (replace_doc_id !== null) {
                 try {
                     await setDoc(doc(db, "users", user_id), existing_doc_data);
@@ -77,6 +77,7 @@ export const StdContextProvider = ({ children }) => {
     });
 
     useEffect(() => {
+        // Obtain the cached data in local storage (if available) and set it on StdContext.
         // The user's phone number and ID are obtained from the auth-flow in Firebase.
         // The complete data can be obtained only from Firestore. To prevent multiple db reads,
         // we will cache the data into local storage. When the user has signed in, and the
@@ -91,7 +92,6 @@ export const StdContextProvider = ({ children }) => {
         }
 
         const ud = localStorage.getItem("user_data");
-        console.log(ud);
         const ud_parsed = ud !== null ? JSON.parse(ud) : null;
         SetUserData(ud_parsed);
     }, [user_data_from_firebase]);
