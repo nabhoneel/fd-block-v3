@@ -2,7 +2,7 @@
 import React, { useState, Suspense, useContext, useEffect } from "react";
 import { useLocation } from "@reach/router";
 import { navigate } from "gatsby";
-import { Button, Card, Select, Spinner, Table } from "flowbite-react";
+import { Button, Modal, Card, Select, Spinner, Table } from "flowbite-react";
 
 // Firebase
 import { Timestamp, arrayUnion, getFirestore, collection, doc, addDoc, updateDoc } from "firebase/firestore";
@@ -57,6 +57,8 @@ const CompleteBooking = () => {
     const [end_date, SetEndDate] = useState(new Date(parseInt(ed)));
     const [event, SetEvent] = useState(Object.keys(event_types)[0]);
     const [floor, SetFloor] = useState(Object.keys(floor_options[event])[0]);
+    const [show_modal, SetShowModal] = useState(false);
+    const [request_handle_in_process, SetRequestHandleInProcess] = useState(false);
 
     const event_types_element = CreateOptions(event_types);
     const [floor_options_element, SetFloorOptionsElement] = useState(CreateOptions(floor_options[event]));
@@ -71,7 +73,7 @@ const CompleteBooking = () => {
         // This is messy: FIRST: we have to reset the list of options ; THEN: we have to repopulate it with the respective options.
         // Otherwise, the floor-option which was chosen for the previous event-type might stay selected for the newly selected event-type,
         // even though the internal value of the floor-option has been reset to the first available one (by state changes).
-        SetFloorOptionsElement(<option></option>);
+        SetFloorOptionsElement(<option aria-label="no-option"></option>);
     };
 
     const HandleFloorChange = e => {
@@ -80,6 +82,7 @@ const CompleteBooking = () => {
     };
 
     const HandleProceed = async e => {
+        SetRequestHandleInProcess(true);
         const db = getFirestore(app);
         const booking_requests_collection = collection(db, "booking_requests");
         const booking_data = {
@@ -102,8 +105,16 @@ const CompleteBooking = () => {
                 await updateDoc(user_doc, {
                     booking_requests: arrayUnion(booking_request_ref),
                 });
+
+                setTimeout(() => {
+                    SetRequestHandleInProcess(false);
+                    SetShowModal(false);
+                    const booking_id = booking_request_ref.id;
+                    navigate(`/dashboard/bookings/new_booking?request_id=${booking_id}`);
+                }, 1000);
             }
         } catch (err) {
+            // TODO: Issue an alert
             console.error("Could not create booking");
             console.error(err);
         }
@@ -204,7 +215,13 @@ const CompleteBooking = () => {
                             {/***** Proceed button *****/}
                             <div className="mt-7 flex">
                                 <div className="ml-auto">
-                                    <Button onClick={HandleProceed}>Request to reserve</Button>
+                                    <Button
+                                        onClick={() => {
+                                            SetShowModal(true);
+                                        }}
+                                    >
+                                        Request to reserve
+                                    </Button>
                                 </div>
                             </div>
                             {/***** End of proceed button *****/}
@@ -238,6 +255,50 @@ const CompleteBooking = () => {
                     {/***** End of cancellation and security deposite details *****/}
                 </div>
             </Card>
+            <Modal
+                show={show_modal}
+                size="md"
+                popup={true}
+                disabled={request_handle_in_process}
+                onClose={() => {
+                    SetShowModal(false);
+                }}
+            >
+                <Modal.Header />
+                <Modal.Body>
+                    {request_handle_in_process === false ? (
+                        <div className="text-center">
+                            <h3 className="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">Confirm this booking request?</h3>
+                            <div className="flex justify-center gap-4">
+                                <Button color="success" onClick={HandleProceed}>
+                                    Yes, I'm sure
+                                </Button>
+                                <Button
+                                    color="gray"
+                                    onClick={() => {
+                                        SetShowModal(false);
+                                    }}
+                                >
+                                    No, cancel
+                                </Button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col text-center">
+                            <span className="mb-5 text-lg">Creating booking request</span>
+                            <Spinner size="xl" />
+                        </div>
+                    )}
+                    <div className="text-slate-500 mt-10">
+                        <hr />
+                        <h5 className="text-base font-semibold mt-5 text-left">Note</h5>
+                        <ul className="list-none text-sm mt-2 text-left">
+                            <li>This request will be notified to the block committee.</li>
+                            <li>Once they approve this booking, payment options will be presented which when completed will confirm these dates to your name.</li>
+                        </ul>
+                    </div>
+                </Modal.Body>
+            </Modal>
         </DashboardLayout>
     );
 };

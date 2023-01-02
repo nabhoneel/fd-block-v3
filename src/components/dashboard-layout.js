@@ -1,15 +1,16 @@
 import React, { useContext } from "react";
 import { navigate } from "gatsby";
-import { Sidebar, Spinner } from "flowbite-react";
+import { Sidebar } from "flowbite-react";
 import { BiListUl, BiBuoy, BiUser, BiCalendarEvent } from "react-icons/bi";
 
 import Layout from "./layout";
+import LoadingCenterSpinnger from "./loading-center";
 import { StdContext } from "../context/StdContext";
 
 export default function DashboardLayout({ children, enableBackgroundPattern = false, className = "", showSidebar = true }) {
     const { NoData, SignedIn } = useContext(StdContext);
     if (NoData()) {
-        return <Spinner aria-label="Default status example" />;
+        return <LoadingCenterSpinnger />;
     }
 
     if (!SignedIn()) {
