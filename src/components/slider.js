@@ -15,7 +15,8 @@ import Img3 from "../assets/images/banquet_outside.jpg";
 // import required modules
 import { Scrollbar, Autoplay } from "swiper";
 
-export default function App() {
+export default function Slider({ className }) {
+    const style_classes = `mySwiper ${className}`;
     return (
         <>
             <Swiper
@@ -27,7 +28,7 @@ export default function App() {
                     disableOnInteraction: false,
                 }}
                 modules={[Scrollbar, Autoplay]}
-                className="mySwiper"
+                className={style_classes}
             >
                 <SwiperSlide>
                     <img alt="shutup-warning" src={Img1} />

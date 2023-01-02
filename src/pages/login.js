@@ -2,15 +2,23 @@
 
 import React, { useState, useContext } from "react";
 import { navigate } from "gatsby";
-import { app } from "../config/firebase";
+import { useLocation } from "@reach/router";
 import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 
-import { Button, Card, Label, TextInput, Checkbox, Spinner } from "flowbite-react";
+import { app } from "../config/firebase";
+import { Button, Card, Label, TextInput, Checkbox } from "flowbite-react";
 
+import LoadingCenterSpinnger from "../components/loading-center";
 import Layout from "../components/layout";
 import { StdContext, StdContextConsumer } from "../context/StdContext";
 
 export default function IndexPage() {
+    // If any route is accessed, which requires user-data, we might redirect to this login page with a single URL query parameter - 'goto',
+    // which will contain the URL to go to, once user sign-in is successful (example: if a booking attempt is made, we need the user to be signed in)
+    const location = useLocation();
+    const params = new URLSearchParams(location.search);
+    const goto_url = params.get("goto");
+
     const [phone_number, SetPhoneNumber] = useState("");
     const [otp, SetOtp] = useState("");
     const [confirmation_result, SetConfirmationResult] = useState(null);
@@ -23,7 +31,11 @@ export default function IndexPage() {
 
     const { NoData, SignedIn, SetUserSigningIn } = useContext(StdContext);
     if (SignedIn()) {
-        navigate("/");
+        if (goto_url !== null) {
+            navigate(goto_url);
+        } else {
+            navigate("/");
+        }
     }
 
     const HandleGenerateOtp = async event => {
@@ -82,11 +94,7 @@ export default function IndexPage() {
 
     if (NoData()) {
         // When the user's logged in state is yet to be determined, show a loading animation
-        return (
-            <Layout>
-                <Spinner aria-label="Extra large spinner example" size="xl" />
-            </Layout>
-        );
+        return <LoadingCenterSpinnger />;
     }
 
     if (!SignedIn()) {

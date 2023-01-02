@@ -62,7 +62,6 @@ const Header = () => {
                             <Dropdown.Divider />
                             <Dropdown.Item onClick={e => SignOut()}>Sign out</Dropdown.Item>
                         </Dropdown>
-                        <Navbar.Toggle />
                     </div>
                 ) : (
                     <Navbar.Link href={routes.get("login")[0]}>{routes.get("login")[1]}</Navbar.Link>

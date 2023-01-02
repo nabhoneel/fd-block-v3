@@ -3,7 +3,7 @@ import React, { createContext, useState, useEffect } from "react";
 
 // Firebase
 import { getAuth } from "firebase/auth";
-import { getFirestore, collection, query, where, getDocs, doc, setDoc, deleteDoc } from "firebase/firestore";
+import { arrayUnion, getFirestore, collection, query, where, getDoc, getDocs, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
 
 // Internal
 import { app } from "../config/firebase";
@@ -11,6 +11,13 @@ import { app } from "../config/firebase";
 export const StdContext = createContext();
 
 export const StdContextProvider = ({ children }) => {
+    const ArrayStringToSet = arr_str => {
+        const arr = arr_str.split(",").map(ts => parseInt(ts));
+        const current_blocked_dates = new Set(blocked_dates);
+        arr.forEach(e => current_blocked_dates.add(e));
+        return current_blocked_dates;
+    };
+
     const [user_signing_in, SetUserSigningIn] = useState(false); // Possible states: [true, false] (used as a semaphore of sorts)
 
     // 'user_id' and 'user_phone_number' have the following possible states:
@@ -21,6 +28,8 @@ export const StdContextProvider = ({ children }) => {
     const [user_phone_number, SetUserPhoneNumber] = useState(null);
     const [user_data, SetUserData] = useState(null);
     const [user_data_from_firebase, SetUserDataFromFirebase] = useState(null);
+    const [blocked_dates, SetBlockedDates] = useState(new Set());
+    const [blocked_dates_from_firebase, SetBlockedDatesFromFirebase] = useState(null);
 
     // 'user_is_admin' can have the following possible states:
     // 1. null (default)
@@ -96,9 +105,86 @@ export const StdContextProvider = ({ children }) => {
         SetUserData(ud_parsed);
     }, [user_data_from_firebase]);
 
+    if (blocked_dates.size === 0) {
+        const bd_ls = localStorage.getItem("blocked_dates");
+        if (bd_ls === null) {
+            console.info("No blocked dates in local storage");
+            const db = getFirestore(app);
+            const bd = doc(db, "system", "blocked_dates");
+            getDoc(bd)
+                .then(doc => {
+                    console.warn("Querying data");
+                    const data = doc.data();
+                    const dates = data ? data["dates"] : [];
+                    const timestamps = dates.map(d => parseInt(d));
+                    SetBlockedDatesFromFirebase(timestamps); // Array of epoch times
+                    console.log(timestamps);
+                })
+                .catch(err => {
+                    console.error("Could not fetch blocked dates from firestore");
+                    console.error(err);
+                });
+        } else {
+            console.info("Fetching blocked dates from local storage");
+            SetBlockedDates(ArrayStringToSet(bd_ls));
+        }
+    }
+
+    useEffect(() => {
+        if (blocked_dates_from_firebase?.length > 0) {
+            console.info("Setting local storage");
+            localStorage.setItem("blocked_dates", [blocked_dates_from_firebase.toString()]);
+        } else {
+            return;
+        }
+
+        const bd = localStorage.getItem("blocked_dates");
+        SetBlockedDates(ArrayStringToSet(bd));
+    }, [blocked_dates_from_firebase]);
+
     const HandleSignOut = v => {
         localStorage.setItem("user_data", null); // Invalidate the cached user data
+        localStorage.clear(); // TODO: Maybe should not be so brute force?
         auth.signOut();
+    };
+
+    const HandleBlockDates = async (start_date, end_date) => {
+        console.info(`Blocking ${start_date} to ${end_date}`);
+        let runner = new Date(start_date);
+        const prev_blocked_dates = new Set(blocked_dates);
+        let current_blocked_dates = new Set(blocked_dates);
+        while (runner <= end_date) {
+            const epoch = Math.ceil(runner.getTime());
+            console.log(`Adding ${epoch}`);
+            current_blocked_dates.add(epoch);
+            runner.setDate(runner.getDate() + 1);
+        }
+
+        if (current_blocked_dates.size === prev_blocked_dates.size) {
+            // TODO: Issue an alert
+            console.warn("No new dates were blocked");
+            return;
+        }
+
+        const db = getFirestore(app);
+        const bd = doc(db, "system", "blocked_dates");
+        let ret_val = false;
+        try {
+            // current_blocked_dates.forEach(d => timestamp_objects.push(Timestamp.fromDate(new Date(d))));
+            await updateDoc(bd, {
+                dates: arrayUnion(...current_blocked_dates),
+            });
+
+            SetBlockedDates(current_blocked_dates);
+            console.log(current_blocked_dates);
+            localStorage.setItem("blocked_dates", [...current_blocked_dates].toString());
+            ret_val = true;
+        } catch (err) {
+            console.error("Could not block dates");
+            console.error(err);
+        }
+
+        return ret_val;
     };
 
     return (
@@ -113,6 +199,9 @@ export const StdContextProvider = ({ children }) => {
                 NoData: () => user_id === null,
                 SignedIn: () => user_id !== null && user_id.length > 0,
                 SignOut: HandleSignOut,
+
+                blocked_dates: [...blocked_dates].map(d => new Date(d)),
+                BlockDates: HandleBlockDates,
             }}
         >
             {children}
