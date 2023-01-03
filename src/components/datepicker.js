@@ -1,12 +1,16 @@
-import React, { useContext, useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Spinner } from "flowbite-react";
 import { DateRange } from "react-date-range";
 import "react-date-range/dist/styles.css"; // main css file
 import "react-date-range/dist/theme/default.css"; // theme css file
 
-import { StdContext } from "../context/StdContext";
+import { getFirestore, onSnapshot, doc } from "firebase/firestore";
+
+// Internal
+import { app } from "../config/firebase";
 
 export default function Datepicker({ StartDate, SetStartDate, EndDate, SetEndDate }) {
+    const [blocked_dates, SetBlockedDates] = useState(null);
     const [local_state, SetLocalState] = useState([
         {
             startDate: StartDate,
@@ -21,7 +25,24 @@ export default function Datepicker({ StartDate, SetStartDate, EndDate, SetEndDat
     }, [local_state]);
 
     const today = new Date();
-    const { blocked_dates } = useContext(StdContext);
+
+    useEffect(() => {
+        let unsubscribe;
+        const GetBlockedDates = async () => {
+            const db = getFirestore(app);
+            const bd = doc(db, "system", "blocked_dates");
+            unsubscribe = onSnapshot(bd, doc => {
+                const data = doc.data();
+                const dates = data ? data["dates"] : [];
+                const date_timestamps = dates.map(d => new Date(d));
+                SetBlockedDates(date_timestamps);
+            });
+        };
+
+        GetBlockedDates();
+        return unsubscribe;
+    });
+
     if (blocked_dates === null) {
         return <Spinner />;
     } else {

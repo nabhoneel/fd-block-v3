@@ -3,7 +3,7 @@ import React, { createContext, useState, useEffect } from "react";
 
 // Firebase
 import { getAuth } from "firebase/auth";
-import { arrayUnion, getFirestore, collection, query, where, onSnapshot, getDocs, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { arrayUnion, getFirestore, collection, query, where, getDoc, getDocs, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
 
 // Internal
 import { app } from "../config/firebase";
@@ -21,7 +21,6 @@ export const StdContextProvider = ({ children }) => {
     const [user_phone_number, SetUserPhoneNumber] = useState(null);
     const [user_data, SetUserData] = useState(null);
     const [user_data_from_firebase, SetUserDataFromFirebase] = useState(null);
-    const [blocked_dates, SetBlockedDates] = useState(null);
 
     // 'user_is_admin' can have the following possible states:
     // 1. null (default)
@@ -31,50 +30,57 @@ export const StdContextProvider = ({ children }) => {
 
     // Cache the user's phone number and other data into StdContext
     const auth = getAuth(app);
-    auth.onAuthStateChanged(async user => {
-        if (user_signing_in) return;
+    useEffect(() => {
+        let unsubscribe;
+        const GetUserState = async () =>
+            auth.onAuthStateChanged(async user => {
+                if (user_signing_in) return;
 
-        if (user) {
-            SetUserPhoneNumber(user.phoneNumber);
-            SetUserId(user.uid);
-            if (user_data !== null) {
-                return;
-            }
+                if (user) {
+                    SetUserPhoneNumber(user.phoneNumber);
+                    SetUserId(user.uid);
+                    if (user_data !== null) {
+                        return;
+                    }
 
-            // If the user's data is NOT cached in the local storage, we need to fetch it and set it
-            const db = getFirestore(app);
-            const users_ref = collection(db, "users");
-            const q = query(users_ref, where("phoneNumber", "==", user_phone_number));
-            const snapshots = await getDocs(q);
-            let replace_doc_id = null;
-            let existing_doc_data = null;
-            snapshots.forEach(doc => {
-                console.warn("Querying data");
-                SetUserDataFromFirebase(doc.data());
-                if (doc.id === user_id) return;
+                    // If the user's data is NOT cached in the local storage, we need to fetch it and set it
+                    const db = getFirestore(app);
+                    const users_ref = collection(db, "users");
+                    const q = query(users_ref, where("phoneNumber", "==", user_phone_number));
+                    const snapshots = await getDocs(q);
+                    let replace_doc_id = null;
+                    let existing_doc_data = null;
+                    snapshots.forEach(doc => {
+                        console.warn("Querying data");
+                        SetUserDataFromFirebase(doc.data());
+                        if (doc.id === user_id) return;
 
-                // It will be ensured that the document's ID in the "users" collection will always be
-                // a Firebase generated user ID. In other cases (pre-filled docs, etc), we will fetch
-                // the existing doc's data, create a new doc with the doc ID set to the user ID, and
-                // remove the existing doc.
-                replace_doc_id = doc.id;
-                existing_doc_data = doc.data();
+                        // It will be ensured that the document's ID in the "users" collection will always be
+                        // a Firebase generated user ID. In other cases (pre-filled docs, etc), we will fetch
+                        // the existing doc's data, create a new doc with the doc ID set to the user ID, and
+                        // remove the existing doc.
+                        replace_doc_id = doc.id;
+                        existing_doc_data = doc.data();
+                    });
+
+                    // This will be a one time operation for preloaded user info
+                    if (replace_doc_id !== null) {
+                        try {
+                            await setDoc(doc(db, "users", user_id), existing_doc_data);
+                            await deleteDoc(doc(db, "users", replace_doc_id));
+                        } catch (err) {
+                            console.error("Could not update existing user doc");
+                            console.log(err);
+                        }
+                    }
+                } else {
+                    SetUserPhoneNumber("");
+                    SetUserId("");
+                }
             });
 
-            // This will be a one time operation for preloaded user info
-            if (replace_doc_id !== null) {
-                try {
-                    await setDoc(doc(db, "users", user_id), existing_doc_data);
-                    await deleteDoc(doc(db, "users", replace_doc_id));
-                } catch (err) {
-                    console.error("Could not update existing user doc");
-                    console.log(err);
-                }
-            }
-        } else {
-            SetUserPhoneNumber("");
-            SetUserId("");
-        }
+        GetUserState();
+        return unsubscribe;
     });
 
     useEffect(() => {
@@ -97,16 +103,6 @@ export const StdContextProvider = ({ children }) => {
         SetUserData(ud_parsed);
     }, [user_data_from_firebase]);
 
-    const db = getFirestore(app);
-    const bd = doc(db, "system", "blocked_dates");
-    onSnapshot(bd, doc => {
-        const data = doc.data();
-        const dates = data ? data["dates"] : [];
-        const dates_set = new Set();
-        dates.forEach(d => dates_set.add(d));
-        SetBlockedDates(dates_set);
-    });
-
     const HandleSignOut = v => {
         localStorage.setItem("user_data", null); // Invalidate the cached user data
         localStorage.clear(); // TODO: Maybe should not be so brute force?
@@ -114,10 +110,22 @@ export const StdContextProvider = ({ children }) => {
     };
 
     const HandleBlockDates = async (start_date, end_date) => {
+        const prev_blocked_dates = new Set();
+        const db = getFirestore(app);
+        const bd = doc(db, "system", "blocked_dates");
+        const bd_doc = await getDoc(bd);
+        if (bd_doc.exists()) {
+            const data = bd_doc.data();
+            const dates = data ? data["dates"] : [];
+            dates.forEach(d => prev_blocked_dates.add(d));
+        } else {
+            console.warn("Creating new blocked dates document");
+            setDoc(bd, { dates: [] });
+        }
+
         console.info(`Blocking ${start_date} to ${end_date}`);
         let runner = new Date(start_date);
-        const prev_blocked_dates = new Set(blocked_dates);
-        let current_blocked_dates = new Set(blocked_dates);
+        let current_blocked_dates = new Set(prev_blocked_dates);
         while (runner <= end_date) {
             const epoch = Math.ceil(runner.getTime());
             console.log(`Adding ${epoch}`);
@@ -131,8 +139,6 @@ export const StdContextProvider = ({ children }) => {
             return;
         }
 
-        const db = getFirestore(app);
-        const bd = doc(db, "system", "blocked_dates");
         let ret_val = false;
         try {
             await updateDoc(bd, {
@@ -161,7 +167,6 @@ export const StdContextProvider = ({ children }) => {
                 SignedIn: () => user_id !== null && user_id.length > 0,
                 SignOut: HandleSignOut,
 
-                blocked_dates: blocked_dates === null ? null : [...blocked_dates].map(d => new Date(d)),
                 BlockDates: HandleBlockDates,
             }}
         >
