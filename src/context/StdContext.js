@@ -3,7 +3,7 @@ import React, { createContext, useState, useEffect } from "react";
 
 // Firebase
 import { getAuth } from "firebase/auth";
-import { arrayUnion, getFirestore, collection, query, where, getDoc, getDocs, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { arrayUnion, arrayRemove, getFirestore, collection, query, where, getDoc, getDocs, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
 
 // Internal
 import { app } from "../config/firebase";
@@ -52,7 +52,7 @@ export const StdContextProvider = ({ children }) => {
                     let existing_doc_data = null;
                     snapshots.forEach(doc => {
                         console.warn("Querying data");
-                        SetUserDataFromFirebase(doc.data());
+                        SetUserDataFromFirebase(doc.data()); // TODO: ONLY INCLUDE THE NECESSARY STUFF
                         if (doc.id === user_id) return;
 
                         // It will be ensured that the document's ID in the "users" collection will always be
@@ -154,6 +154,34 @@ export const StdContextProvider = ({ children }) => {
         return ret_val;
     };
 
+    const HandleUnblockDates = async (start_date, end_date) => {
+        console.info(`Unblocking ${start_date} to ${end_date}`);
+        let runner = new Date(start_date);
+        let remove_dates = new Set();
+        while (runner <= end_date) {
+            const epoch = Math.ceil(runner.getTime());
+            console.log(`Adding ${epoch}`);
+            remove_dates.add(epoch);
+            runner.setDate(runner.getDate() + 1);
+        }
+
+        let ret_val = false;
+        try {
+            const db = getFirestore(app);
+            const bd = doc(db, "system", "blocked_dates");
+            await updateDoc(bd, {
+                dates: arrayRemove(...remove_dates),
+            });
+
+            ret_val = true;
+        } catch (err) {
+            console.error("Could not unblock dates");
+            console.error(err);
+        }
+
+        return ret_val;
+    };
+
     return (
         <StdContext.Provider
             value={{
@@ -168,6 +196,7 @@ export const StdContextProvider = ({ children }) => {
                 SignOut: HandleSignOut,
 
                 BlockDates: HandleBlockDates,
+                UnblockDates: HandleUnblockDates,
             }}
         >
             {children}

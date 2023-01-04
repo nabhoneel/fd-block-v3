@@ -28,13 +28,13 @@ export default function DashboardLayout({ children, enableBackgroundPattern = fa
                                 <Sidebar.Items>
                                     <Sidebar.ItemGroup>
                                         <Sidebar.Item href="/dashboard/profile" icon={BiUser}>
-                                            <span className="text-sm">Profile</span>
+                                            <span className="text-sm tracking-tight font-semibold text-slate-500 uppercase">Profile</span>
                                         </Sidebar.Item>
                                         <Sidebar.Item href="/dashboard/bookings" icon={BiCalendarEvent}>
-                                            <span className="text-sm">My Bookings</span>
+                                            <span className="text-sm tracking-tight font-semibold text-slate-500 uppercase">My Bookings</span>
                                         </Sidebar.Item>
                                         <Sidebar.Item href="/dashboard/block-dir" icon={BiListUl}>
-                                            <span className="text-sm">Block Directory</span>
+                                            <span className="text-sm tracking-tight font-semibold text-slate-500 uppercase">Block Directory</span>
                                         </Sidebar.Item>
                                     </Sidebar.ItemGroup>
                                     <Sidebar.ItemGroup>

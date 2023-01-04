@@ -5,7 +5,7 @@ import { navigate } from "gatsby";
 import { Button, Modal, Card, Select, Spinner, Table } from "flowbite-react";
 
 // Firebase
-import { Timestamp, arrayUnion, getFirestore, collection, doc, addDoc, updateDoc } from "firebase/firestore";
+import { arrayUnion, getFirestore, collection, doc, setDoc, updateDoc } from "firebase/firestore";
 
 // Internal UI components
 import LoadingCenterSpinnger from "../../components/loading-center";
@@ -13,12 +13,14 @@ import DashboardLayout from "../../components/dashboard-layout";
 import Datepicker from "../../components/datepicker";
 
 // Internal data utils
-import { event_types, floor_options, cost_table } from "../../assets/data/community_hall_rates.js";
+import { event_types, floor_options, cost_table } from "../../helpers/community_hall_rates.js";
+import Booking from "../../helpers/Booking";
+import { Constants, Collections } from "../../helpers/constants";
 import { StdContext } from "../../context/StdContext";
 import { app } from "../../config/firebase";
 
 const CompleteBooking = () => {
-    const { BlockDates, NoData, SignedIn, user_data, user_id } = useContext(StdContext);
+    const { BlockDates, UnblockDates, NoData, SignedIn, user_data, user_id } = useContext(StdContext);
     const location = useLocation();
     const params = new URLSearchParams(location.search);
     const sd = params.get("sd");
@@ -84,39 +86,35 @@ const CompleteBooking = () => {
     const HandleProceed = async e => {
         SetRequestHandleInProcess(true);
         const db = getFirestore(app);
-        const booking_requests_collection = collection(db, "booking_requests");
-        const booking_data = {
-            user_id: user_id,
-            is_block_member: user_data && user_data["isMember"] === true,
-            booking_range: { start_date: Timestamp.fromDate(start_date), end_date: Timestamp.fromDate(end_date) },
-            event: event,
-            floor: floor,
-        };
+        const booking_requests_collection = collection(db, Collections.BOOKINGS);
+        const booking_data = new Booking(user_id, user_data && user_data["isMember"] === true, start_date, end_date, event, floor, Constants.STATUS_REQUEST);
 
         try {
             // Step 1: Block this range of dates in the system collection (this will also check whether they can be blocked)
             const status = BlockDates(start_date, end_date);
             if (status) {
                 // Step 2: Create the booking request
-                const booking_request_ref = await addDoc(booking_requests_collection, booking_data);
+                const booking_request_ref = doc(booking_requests_collection).withConverter(Booking.FirestoreConverter);
+                await setDoc(booking_request_ref, booking_data);
 
                 // Step 3: Add the booking request to the user's document
-                const user_doc = doc(db, "users", user_id);
+                const user_doc = doc(db, Collections.USERS, user_id);
                 await updateDoc(user_doc, {
-                    booking_requests: arrayUnion(booking_request_ref),
+                    bookings: arrayUnion(booking_request_ref),
                 });
 
                 setTimeout(() => {
                     SetRequestHandleInProcess(false);
                     SetShowModal(false);
                     const booking_id = booking_request_ref.id;
-                    navigate(`/dashboard/bookings/new_booking?request_id=${booking_id}`);
+                    navigate(`/dashboard/bookings/view_booking?request_id=${booking_id}`);
                 }, 1000);
             }
         } catch (err) {
             // TODO: Issue an alert
             console.error("Could not create booking");
             console.error(err);
+            UnblockDates(start_date, end_date);
         }
     };
     ////////////////////////////////////////////////////////////////////////////////
