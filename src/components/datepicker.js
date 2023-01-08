@@ -4,12 +4,12 @@ import { DateRange } from "react-date-range";
 import "react-date-range/dist/styles.css"; // main css file
 import "react-date-range/dist/theme/default.css"; // theme css file
 
-import { getFirestore, onSnapshot, doc } from "firebase/firestore";
+import { getFirestore, getDoc, doc } from "firebase/firestore";
 
 // Internal
 import { app } from "../config/firebase";
 
-export default function Datepicker({ StartDate, SetStartDate, EndDate, SetEndDate }) {
+export default function Datepicker({ StartDate, SetStartDate, EndDate, SetEndDate, unblockedSetOfDates = null }) {
     const [blocked_dates, SetBlockedDates] = useState(null);
     const [local_state, SetLocalState] = useState([
         {
@@ -25,23 +25,27 @@ export default function Datepicker({ StartDate, SetStartDate, EndDate, SetEndDat
     }, [local_state]);
 
     const today = new Date();
+    const unblock = unblockedSetOfDates !== null ? new Set([...unblockedSetOfDates]) : new Set();
 
     useEffect(() => {
-        let unsubscribe;
         const GetBlockedDates = async () => {
             const db = getFirestore(app);
             const bd = doc(db, "system", "blocked_dates");
-            unsubscribe = onSnapshot(bd, doc => {
-                const data = doc.data();
+            const snap = await getDoc(bd);
+            console.warn("Querying data");
+            if (snap.exists()) {
+                const data = snap.data();
                 const dates = data ? data["dates"] : [];
-                const date_timestamps = dates.map(d => new Date(d));
+                const filtered_dates = unblock.length === 0 ? dates : dates.filter(d => !unblock.has(d));
+                const date_timestamps = filtered_dates.map(d => new Date(d));
                 SetBlockedDates(date_timestamps);
-            });
+            } else {
+                SetBlockedDates([]);
+            }
         };
 
-        GetBlockedDates();
-        return unsubscribe;
-    });
+        if (blocked_dates === null) GetBlockedDates();
+    }, [unblockedSetOfDates]);
 
     if (blocked_dates === null) {
         return <Spinner />;

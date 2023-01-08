@@ -32,7 +32,8 @@ const Header = () => {
         }
     });
 
-    const { NoData, SignedIn, SignOut, user_phone_number, user_data } = useContext(StdContext);
+    const { NoData, SignedIn, SignOut, GetUserData, user_phone_number } = useContext(StdContext);
+    const user_data = GetUserData();
 
     return (
         <Navbar fluid={true} rounded={true}>
@@ -60,11 +61,24 @@ const Header = () => {
                                 <Link to="/dashboard/block-dir">Block Directory</Link>
                             </Dropdown.Item>
                             <Dropdown.Divider />
+                            {user_data?.is_admin ? (
+                                <>
+                                    <Dropdown.Item>
+                                        <Link to="/dashboard/admin/manage-bookings">Manage Bookings</Link>
+                                    </Dropdown.Item>
+                                    <Dropdown.Item>
+                                        <Link to="/dashboard/admin/manage-users">Manage Users</Link>
+                                    </Dropdown.Item>
+                                    <Dropdown.Divider />
+                                </>
+                            ) : null}
                             <Dropdown.Item onClick={e => SignOut()}>Sign out</Dropdown.Item>
                         </Dropdown>
                     </div>
                 ) : (
-                    <Navbar.Link href={routes.get("login")[0]}>{routes.get("login")[1]}</Navbar.Link>
+                    <Navbar.Link href={routes.get("login")[0]}>
+                        <span className="">{routes.get("login")[1]}</span>
+                    </Navbar.Link>
                 )}
                 <Navbar.Toggle />
             </div>

@@ -1,16 +1,20 @@
 import React, { useContext } from "react";
 import { navigate } from "gatsby";
 import { Sidebar } from "flowbite-react";
-import { BiListUl, BiBuoy, BiUser, BiCalendarEvent } from "react-icons/bi";
+import { BiBuoy } from "react-icons/bi";
+import { CgPullClear, CgUserList } from "react-icons/cg";
+import { FcBusinessContact, FcDataSheet, FcCalendar } from "react-icons/fc";
 
 import Layout from "./layout";
-import LoadingCenterSpinnger from "./loading-center";
+import LoadingCenterSpinnner from "./loading-center";
 import { StdContext } from "../context/StdContext";
 
-export default function DashboardLayout({ children, enableBackgroundPattern = false, className = "", showSidebar = true }) {
-    const { NoData, SignedIn } = useContext(StdContext);
+export default function DashboardLayout({ children, enableBackgroundPattern = true, className = "", showSidebar = true }) {
+    const { NoData, SignedIn, GetUserData } = useContext(StdContext);
+    const user_data = GetUserData();
+
     if (NoData()) {
-        return <LoadingCenterSpinnger />;
+        return <LoadingCenterSpinnner />;
     }
 
     if (!SignedIn()) {
@@ -27,16 +31,26 @@ export default function DashboardLayout({ children, enableBackgroundPattern = fa
                             <Sidebar aria-label="Sidebar with content separator example">
                                 <Sidebar.Items>
                                     <Sidebar.ItemGroup>
-                                        <Sidebar.Item href="/dashboard/profile" icon={BiUser}>
+                                        <Sidebar.Item href="/dashboard/profile" icon={FcBusinessContact}>
                                             <span className="text-sm tracking-tight font-semibold text-slate-500 uppercase">Profile</span>
                                         </Sidebar.Item>
-                                        <Sidebar.Item href="/dashboard/bookings" icon={BiCalendarEvent}>
+                                        <Sidebar.Item href="/dashboard/bookings" icon={FcCalendar}>
                                             <span className="text-sm tracking-tight font-semibold text-slate-500 uppercase">My Bookings</span>
                                         </Sidebar.Item>
-                                        <Sidebar.Item href="/dashboard/block-dir" icon={BiListUl}>
+                                        <Sidebar.Item href="/dashboard/block-dir" icon={FcDataSheet}>
                                             <span className="text-sm tracking-tight font-semibold text-slate-500 uppercase">Block Directory</span>
                                         </Sidebar.Item>
                                     </Sidebar.ItemGroup>
+                                    {user_data.is_admin ? (
+                                        <Sidebar.ItemGroup>
+                                            <Sidebar.Item href="/dashboard/admin/manage-bookings" icon={CgPullClear}>
+                                                <span className="text-sm tracking-tight font-semibold text-slate-500 uppercase">Manage Bookings</span>
+                                            </Sidebar.Item>
+                                            <Sidebar.Item href="/dashboard/admin/manage-users" icon={CgUserList}>
+                                                <span className="text-sm tracking-tight font-semibold text-slate-500 uppercase">Manage Users</span>
+                                            </Sidebar.Item>
+                                        </Sidebar.ItemGroup>
+                                    ) : null}
                                     <Sidebar.ItemGroup>
                                         <Sidebar.Item href="/help" icon={BiBuoy}>
                                             Help

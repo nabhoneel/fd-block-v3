@@ -3,7 +3,7 @@ import React, { createContext, useState, useEffect } from "react";
 
 // Firebase
 import { getAuth } from "firebase/auth";
-import { arrayUnion, arrayRemove, getFirestore, collection, query, where, getDoc, getDocs, doc, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, collection, query, where, getDoc, getDocs, doc, setDoc, deleteDoc } from "firebase/firestore";
 
 // Internal
 import { app } from "../config/firebase";
@@ -11,6 +11,27 @@ import { app } from "../config/firebase";
 export const StdContext = createContext();
 
 export const StdContextProvider = ({ children }) => {
+    const ProcessUserData = d => {
+        delete d.bookings;
+        delete d.membershipStatus;
+        return d;
+    };
+
+    const PopulateUserDataFromFirestore = async () => {
+        const db = getFirestore(app);
+        try {
+            const user_ref = doc(db, "users", user_id);
+            const user_doc = await getDoc(user_ref);
+            if (user_doc.exists()) {
+                const d = user_doc.data();
+                const processed_data = ProcessUserData(d);
+                SetUserDataFromFirebase(processed_data);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     const [user_signing_in, SetUserSigningIn] = useState(false); // Possible states: [true, false] (used as a semaphore of sorts)
 
     // 'user_id' and 'user_phone_number' have the following possible states:
@@ -45,14 +66,14 @@ export const StdContextProvider = ({ children }) => {
 
                     // If the user's data is NOT cached in the local storage, we need to fetch it and set it
                     const db = getFirestore(app);
-                    const users_ref = collection(db, "users");
-                    const q = query(users_ref, where("phoneNumber", "==", user_phone_number));
+                    const users_collection = collection(db, "users");
+                    const q = query(users_collection, where("phoneNumber", "==", user_phone_number));
                     const snapshots = await getDocs(q);
                     let replace_doc_id = null;
                     let existing_doc_data = null;
                     snapshots.forEach(doc => {
                         console.warn("Querying data");
-                        SetUserDataFromFirebase(doc.data()); // TODO: ONLY INCLUDE THE NECESSARY STUFF
+                        SetUserDataFromFirebase(doc.data());
                         if (doc.id === user_id) return;
 
                         // It will be ensured that the document's ID in the "users" collection will always be
@@ -103,83 +124,27 @@ export const StdContextProvider = ({ children }) => {
         SetUserData(ud_parsed);
     }, [user_data_from_firebase]);
 
+    const IsSignedIn = () => {
+        return user_id !== null && user_id.length > 0;
+    };
+
+    const HandleGetUserData = () => {
+        if (!IsSignedIn()) return;
+
+        if (user_data === null) {
+            const local_storage_data = localStorage.getItem("user_data");
+            if (local_storage_data === null) {
+                PopulateUserDataFromFirestore();
+            }
+        }
+
+        return user_data;
+    };
+
     const HandleSignOut = v => {
         localStorage.setItem("user_data", null); // Invalidate the cached user data
         localStorage.clear(); // TODO: Maybe should not be so brute force?
         auth.signOut();
-    };
-
-    const HandleBlockDates = async (start_date, end_date) => {
-        const prev_blocked_dates = new Set();
-        const db = getFirestore(app);
-        const bd = doc(db, "system", "blocked_dates");
-        const bd_doc = await getDoc(bd);
-        if (bd_doc.exists()) {
-            const data = bd_doc.data();
-            const dates = data ? data["dates"] : [];
-            dates.forEach(d => prev_blocked_dates.add(d));
-        } else {
-            console.warn("Creating new blocked dates document");
-            setDoc(bd, { dates: [] });
-        }
-
-        console.info(`Blocking ${start_date} to ${end_date}`);
-        let runner = new Date(start_date);
-        let current_blocked_dates = new Set(prev_blocked_dates);
-        while (runner <= end_date) {
-            const epoch = Math.ceil(runner.getTime());
-            console.log(`Adding ${epoch}`);
-            current_blocked_dates.add(epoch);
-            runner.setDate(runner.getDate() + 1);
-        }
-
-        if (current_blocked_dates.size === prev_blocked_dates.size) {
-            // TODO: Issue an alert
-            console.warn("No new dates were blocked");
-            return;
-        }
-
-        let ret_val = false;
-        try {
-            await updateDoc(bd, {
-                dates: arrayUnion(...current_blocked_dates),
-            });
-
-            ret_val = true;
-        } catch (err) {
-            console.error("Could not block dates");
-            console.error(err);
-        }
-
-        return ret_val;
-    };
-
-    const HandleUnblockDates = async (start_date, end_date) => {
-        console.info(`Unblocking ${start_date} to ${end_date}`);
-        let runner = new Date(start_date);
-        let remove_dates = new Set();
-        while (runner <= end_date) {
-            const epoch = Math.ceil(runner.getTime());
-            console.log(`Adding ${epoch}`);
-            remove_dates.add(epoch);
-            runner.setDate(runner.getDate() + 1);
-        }
-
-        let ret_val = false;
-        try {
-            const db = getFirestore(app);
-            const bd = doc(db, "system", "blocked_dates");
-            await updateDoc(bd, {
-                dates: arrayRemove(...remove_dates),
-            });
-
-            ret_val = true;
-        } catch (err) {
-            console.error("Could not unblock dates");
-            console.error(err);
-        }
-
-        return ret_val;
     };
 
     return (
@@ -190,13 +155,10 @@ export const StdContextProvider = ({ children }) => {
 
                 user_id,
                 user_phone_number,
-                user_data,
+                GetUserData: HandleGetUserData,
                 NoData: () => user_id === null,
-                SignedIn: () => user_id !== null && user_id.length > 0,
+                SignedIn: IsSignedIn,
                 SignOut: HandleSignOut,
-
-                BlockDates: HandleBlockDates,
-                UnblockDates: HandleUnblockDates,
             }}
         >
             {children}
