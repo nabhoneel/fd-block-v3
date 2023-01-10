@@ -93,7 +93,7 @@ const ListBookings = ({ listAll = false }) => {
                     <Table.Cell>{booking_obj.GetStartDateString()}</Table.Cell>
                     <Table.Cell>{booking_obj.GetDuration()} days</Table.Cell>
                     <Table.Cell>{booking_obj.GetEventString()}</Table.Cell>
-                    {filter === null ? <Table.Cell>{booking_obj.GetStatusString()}</Table.Cell> : null}
+                    {filter === null || filter === REQUESTS ? <Table.Cell>{booking_obj.GetStatusString()}</Table.Cell> : null}
                     <Table.Cell>
                         <Link to={`/dashboard/bookings/view_booking?id=${booking_obj.id}`}>
                             <span className="text-blue-500">View</span>

@@ -1,4 +1,5 @@
-import { Timestamp, doc, getFirestore, updateDoc } from "firebase/firestore";
+import { Timestamp, doc, getFirestore, updateDoc, arrayUnion } from "firebase/firestore";
+
 import { Constants } from "./constants";
 import { DateToString, DateDiff, IsEqual, UnblockDates, BlockDates } from "./utils";
 import { event_types, floor_options } from "./community_hall_rates";
@@ -6,7 +7,9 @@ import { Collections } from "./constants";
 import { app } from "../config/firebase";
 
 class Booking {
-    constructor(user_id, is_block_member, start_date, end_date, event_type, floor_option, status, created_on = new Date(), id = null) {
+    static REJECTION_REASON_KEY = "rejection_reason";
+
+    constructor(user_id, is_block_member, start_date, end_date, event_type, floor_option, status, created_on = new Date(), modified_by = [], comments = {}, id = null) {
         this.user_id = user_id;
         this.is_block_member = is_block_member;
         this.start_date = start_date;
@@ -16,6 +19,8 @@ class Booking {
         this.status = status;
         this.created_on = created_on;
         this.id = id;
+        this.modified_by = modified_by;
+        this.comments = comments;
     }
 
     IsRequest() {
@@ -24,6 +29,10 @@ class Booking {
 
     IsRejected() {
         return this.status === Constants.STATUS_REJECTED;
+    }
+
+    IsConfirmed() {
+        return this.status === Constants.STATUS_CONFIRMED;
     }
 
     IsUpcoming() {
@@ -125,19 +134,42 @@ class Booking {
         }
     }
 
+    async SetBookingStatus(status, modifier_id, comments = "") {
+        const db = getFirestore(app);
+        const booking_requests_ref = doc(db, Collections.BOOKINGS, this.id);
+        const modifier_ref = doc(db, Collections.USERS, modifier_id);
+        let updated_doc = {
+            status: status,
+            modified_by: arrayUnion({
+                modifier: modifier_ref,
+                status: status,
+                timestamp: Timestamp.fromDate(new Date()),
+            }),
+        };
+
+        if (status === Constants.STATUS_REJECTED) {
+            updated_doc.comments = { ...this.comments, rejection_reason: comments };
+        }
+
+        await updateDoc(booking_requests_ref, updated_doc);
+    }
+
     static FirestoreConverter = {
-        toFirestore: city => {
+        toFirestore: booking => {
             return {
-                user_id: city.user_id,
-                is_block_member: city.is_block_member,
-                start_date: Timestamp.fromDate(city.start_date),
-                end_date: Timestamp.fromDate(city.end_date),
-                event_type: city.event_type,
-                floor_option: city.floor_option,
-                status: city.status,
-                created_on: Timestamp.fromDate(city.created_on),
+                user_id: booking.user_id,
+                is_block_member: booking.is_block_member,
+                start_date: Timestamp.fromDate(booking.start_date),
+                end_date: Timestamp.fromDate(booking.end_date),
+                event_type: booking.event_type,
+                floor_option: booking.floor_option,
+                status: booking.status,
+                created_on: Timestamp.fromDate(booking.created_on),
+                modified_by: booking.modified_by?.map(m => ({ modifier: m.modifier, status: m.status, timestamp: m.toDate() })),
+                comments: booking.comments,
             };
         },
+
         fromFirestore: (snapshot, options) => {
             const data = snapshot.data(options);
             return new Booking(
@@ -149,6 +181,8 @@ class Booking {
                 data.floor_option,
                 data.status,
                 data.created_on.toDate(),
+                data.modified_by,
+                data.comments === undefined ? {} : data.comments,
                 snapshot.id
             );
         },

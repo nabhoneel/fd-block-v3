@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import { navigate } from "gatsby";
-import { Spinner, Card, Button, Modal, Alert } from "flowbite-react";
+import { Spinner, Card, Button, Modal, Alert, Textarea } from "flowbite-react";
 import { useLocation } from "@reach/router";
 
 import { getFirestore, doc, getDoc, updateDoc, deleteDoc, arrayRemove } from "firebase/firestore";
@@ -9,8 +9,8 @@ import DashboardLayout from "../../../components/dashboard-layout";
 
 import { app } from "../../../config/firebase";
 import { StdContext } from "../../../context/StdContext";
-import { UnblockDates } from "../../../helpers/utils";
-import { Collections } from "../../../helpers/constants";
+import { BlockDates, UnblockDates } from "../../../helpers/utils";
+import { Constants, Collections } from "../../../helpers/constants";
 import Booking from "../../../helpers/Booking";
 
 // TODO: Share the booking object via context. Use it by verifying proper details. Clear it at the proper time.
@@ -23,12 +23,22 @@ const Bookings = () => {
     const { GetUserData, user_id } = useContext(StdContext);
     const user_data = GetUserData();
 
+    ////////////////////////////////////////////////////////////////////////////////
+    // States in this component
+    ////////////////////////////////////////////////////////////////////////////////
     const [booking_obj, SetBookingObj] = useState(null);
-    const [show_delete_confirmation, SetShowDeleteConfirmation] = useState(false);
+    const [rejection_reason, SetRejectionReason] = useState("");
+
+    // UI stuff
     const [booking_deletion_in_progress, SetBookingDeletionInProgress] = useState(false);
+    const [booking_acceptance_in_progress, SetBookingAcceptanceInProgress] = useState(false);
+    const [booking_rejection_in_progress, SetBookingRejectionInProgress] = useState(false);
+
     const [show_unauthorized_access, SetShowUnauthorizedAccess] = useState(false);
+    const [show_delete_confirmation, SetShowDeleteConfirmation] = useState(false);
     const [show_cancel_booking_request, SetShowCancelBookingRequest] = useState(false);
     const [show_accept_booking_request, SetShowAcceptBookingRequest] = useState(false);
+    ////////////////////////////////////////////////////////////////////////////////
 
     useEffect(() => {
         if (booking_obj !== null) return;
@@ -45,9 +55,12 @@ const Bookings = () => {
                     SetBookingObj(booking_doc.data()); // Booking object will get set
                     return;
                 } else {
+                    console.warn("Preventing unauthorized access");
+                    console.debug(user_data?.is_admin);
+                    console.debug(booking_data.user_id === user_id);
                     SetShowUnauthorizedAccess(true);
                     setTimeout(() => {
-                        navigate("/dashboard/bookings");
+                        navigate(-1);
                     }, 2000);
                 }
             } else {
@@ -59,7 +72,7 @@ const Bookings = () => {
         };
 
         GetBookingDetails();
-    });
+    }, [user_data]);
 
     const HandleEditBooking = () => {
         navigate(`/dashboard/bookings/edit_booking?id=${booking_obj.id}`);
@@ -82,10 +95,33 @@ const Bookings = () => {
         setTimeout(() => {
             SetBookingDeletionInProgress(false);
             SetShowDeleteConfirmation(false);
-            navigate("/dashboard/bookings");
+            navigate(-1);
         }, 1000);
     };
 
+    const HandleBookingAcceptance = async () => {
+        SetBookingAcceptanceInProgress(true);
+        await booking_obj.SetBookingStatus(Constants.STATUS_CONFIRMED, user_id);
+        await BlockDates(booking_obj.start_date, booking_obj.end_date);
+        setTimeout(() => {
+            SetBookingAcceptanceInProgress(false);
+            SetShowAcceptBookingRequest(false);
+            navigate(-1);
+        }, 1000);
+    };
+
+    const HandleBookingRejection = async () => {
+        SetBookingRejectionInProgress(true);
+        await booking_obj.SetBookingStatus(Constants.STATUS_REJECTED, user_id, rejection_reason);
+        await UnblockDates(booking_obj.start_date, booking_obj.end_date);
+        setTimeout(() => {
+            SetBookingRejectionInProgress(false);
+            SetShowCancelBookingRequest(false);
+            navigate(-1);
+        }, 1000);
+    };
+
+    /* TODO: SHOW REJECTION REASON (in case request has been rejected) */
     return (
         <DashboardLayout>
             <div className="w-full">
@@ -147,7 +183,7 @@ const Bookings = () => {
                         <hr />
                         {booking_obj === null || Object.keys(booking_obj).length === 0 ? null : (
                             <div className="mt-5 flex justify-end">
-                                {booking_obj.user_id !== user_id ? null : (
+                                {booking_obj.IsConfirmed() || booking_obj.user_id !== user_id ? null : (
                                     <>
                                         <span className="mr-5">
                                             <Button color="light" onClick={HandleEditBooking}>
@@ -168,17 +204,19 @@ const Bookings = () => {
                                 )}
                                 {user_data?.is_admin ? (
                                     <>
-                                        <span className="mx-5">
-                                            <Button
-                                                color="success"
-                                                onClick={() => {
-                                                    SetShowAcceptBookingRequest(true);
-                                                }}
-                                            >
-                                                Accept booking request
-                                            </Button>
-                                        </span>
-                                        {booking_obj.user_id !== user_id ? (
+                                        {booking_obj.IsRequest() || booking_obj.IsRejected() ? (
+                                            <span className="mx-5">
+                                                <Button
+                                                    color="success"
+                                                    onClick={() => {
+                                                        SetShowAcceptBookingRequest(true);
+                                                    }}
+                                                >
+                                                    Accept booking request
+                                                </Button>
+                                            </span>
+                                        ) : null}
+                                        {(booking_obj.IsRequest() || booking_obj.IsConfirmed()) && booking_obj.user_id !== user_id ? (
                                             <span className="">
                                                 <Button
                                                     color="failure"
@@ -229,6 +267,92 @@ const Bookings = () => {
                         <div className="flex flex-col text-center">
                             <span className="mb-5 text-lg">Deleting booking request</span>
                             <Spinner color="failure" size="xl" />
+                        </div>
+                    )}
+                </Modal.Body>
+            </Modal>
+
+            <Modal
+                show={show_accept_booking_request}
+                size="md"
+                popup={true}
+                onClose={() => {
+                    SetShowAcceptBookingRequest(false);
+                }}
+            >
+                <Modal.Header />
+                <Modal.Body>
+                    {booking_acceptance_in_progress === false ? (
+                        <div className="text-center">
+                            <h3 className="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">Sure you want to accept this booking request?</h3>
+                            <div className="flex justify-center gap-4">
+                                <Button color="success" onClick={HandleBookingAcceptance}>
+                                    Yes, I'm sure
+                                </Button>
+                                <Button
+                                    color="gray"
+                                    onClick={() => {
+                                        SetShowAcceptBookingRequest(false);
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col text-center">
+                            <span className="mb-5 text-lg">Accepting booking request</span>
+                            <Spinner color="success" size="xl" />
+                        </div>
+                    )}
+                </Modal.Body>
+            </Modal>
+
+            <Modal
+                show={show_cancel_booking_request}
+                size="md"
+                popup={true}
+                onClose={() => {
+                    SetShowCancelBookingRequest(false);
+                }}
+            >
+                <Modal.Header />
+                <Modal.Body>
+                    {booking_rejection_in_progress === false ? (
+                        <div className="text-center">
+                            <h3 className="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">Sure you want to cancel this booking request?</h3>
+                            <div className="flex flex-col">
+                                <div className="mb-5">
+                                    <Textarea
+                                        placeholder="Leave a comment..."
+                                        value={rejection_reason}
+                                        onChange={e => {
+                                            const text = e.target.value;
+                                            SetRejectionReason(text);
+                                        }}
+                                        required={true}
+                                        rows={4}
+                                    />
+                                </div>
+                                <div className="flex justify-center gap-4">
+                                    <Button color="failure" disabled={rejection_reason?.trim()?.length === 0} onClick={HandleBookingRejection}>
+                                        Yes, cancel
+                                    </Button>
+                                    <Button
+                                        color="gray"
+                                        onClick={() => {
+                                            SetShowCancelBookingRequest(false);
+                                        }}
+                                    >
+                                        No, don't cancel
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col text-center">
+                            <span className="mb-5 text-lg">Cancelling booking request</span>
+                            <Spinner color="warning" size="xl" />
                         </div>
                     )}
                 </Modal.Body>

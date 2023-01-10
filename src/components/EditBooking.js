@@ -136,7 +136,7 @@ const EditBooking = ({ startDate = new Date(), endDate = new Date(), bookingObje
                 SetRequestHandleInProcess(false);
                 SetShowModal(false);
                 const booking_id = booking_request_ref.id;
-                navigate(`/dashboard/bookings/view_booking?request_id=${booking_id}`);
+                navigate(`/dashboard/bookings/view_booking?id=${booking_id}`);
             }, 1000);
         } catch (err) {
             // TODO: Issue an alert

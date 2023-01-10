@@ -73,7 +73,7 @@ export const StdContextProvider = ({ children }) => {
                     let existing_doc_data = null;
                     snapshots.forEach(doc => {
                         console.warn("Querying data");
-                        SetUserDataFromFirebase(doc.data());
+                        SetUserDataFromFirebase(ProcessUserData(doc.data()));
                         if (doc.id === user_id) return;
 
                         // It will be ensured that the document's ID in the "users" collection will always be
@@ -142,6 +142,9 @@ export const StdContextProvider = ({ children }) => {
     };
 
     const HandleSignOut = v => {
+        SetUserData(null);
+        SetUserDataFromFirebase(null);
+        SetUserId(null);
         localStorage.setItem("user_data", null); // Invalidate the cached user data
         localStorage.clear(); // TODO: Maybe should not be so brute force?
         auth.signOut();
