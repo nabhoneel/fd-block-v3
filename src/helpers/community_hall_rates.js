@@ -12,14 +12,14 @@ const floor_options = {
 
 const cost_table = {
     non_residents: {
-        marriage: { first_two: 70000, all: 90000, security_deposit: 10000 },
+        marriage: { first_two: 70000, all: 85000, security_deposit: 10000 },
         general: { ground: 20000, first_two: 20000 * 2, all: 20000 * 3, security_deposit: 5000 },
         funeral: { ground: 10000, first_two: 10000 * 2, all: 10000 * 3, security_deposit: 3000 },
     },
     residents: {
         marriage: { first_two: 30000, all: 40000, security_deposit: 5000 },
         general: { ground: 10000, first_two: 10000 * 2, all: 10000 * 3, security_deposit: 5000 },
-        funeral: { ground: 5000, first_two: 5000 * 2, all: 5000 * 3, security_deposit: 3000 },
+        funeral: { ground: 4000, first_two: 4000 * 2, all: 4000 * 3, security_deposit: 3000 },
     },
 };
 
