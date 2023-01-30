@@ -7,6 +7,11 @@ class Constants {
 class Collections {
     static USERS = "users";
     static BOOKINGS = "bookings";
+    static SYSTEM = "system";
 }
 
-export { Constants, Collections };
+class DocNames {
+    static BLOCKED_DATES = "blocked_dates";
+}
+
+export { Constants, Collections, DocNames };

@@ -8,6 +8,7 @@ import { getFirestore, getDoc, doc } from "firebase/firestore";
 
 // Internal
 import { app } from "../config/firebase";
+import { Collections, DocNames } from "../helpers/constants";
 
 export default function Datepicker({ StartDate, SetStartDate, EndDate, SetEndDate, unblockedSetOfDates = null }) {
     const [blocked_dates, SetBlockedDates] = useState(null);
@@ -30,7 +31,7 @@ export default function Datepicker({ StartDate, SetStartDate, EndDate, SetEndDat
     useEffect(() => {
         const GetBlockedDates = async () => {
             const db = getFirestore(app);
-            const bd = doc(db, "system", "blocked_dates");
+            const bd = doc(db, Collections.SYSTEM, DocNames.BLOCKED_DATES);
             const snap = await getDoc(bd);
             console.warn("Querying data");
             if (snap.exists()) {

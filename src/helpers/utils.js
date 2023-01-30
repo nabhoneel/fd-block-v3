@@ -1,5 +1,7 @@
 import { Timestamp, getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+
 import { app } from "../config/firebase";
+import { Collections, DocNames } from "../helpers/constants";
 
 const MoneyFormat = s => {
     let amount = `${s}`;
@@ -58,7 +60,7 @@ const IsEqual = (a, b) => {
 const BlockDates = async (start_date, end_date) => {
     const prev_blocked_dates = new Set();
     const db = getFirestore(app);
-    const bd = doc(db, "system", "blocked_dates");
+    const bd = doc(db, Collections.SYSTEM, DocNames.BLOCKED_DATES);
     const bd_doc = await getDoc(bd);
     if (bd_doc.exists()) {
         const data = bd_doc.data();
@@ -100,7 +102,7 @@ const UnblockDates = async (start_date, end_date) => {
     let ret_val = false;
     try {
         const db = getFirestore(app);
-        const bd = doc(db, "system", "blocked_dates");
+        const bd = doc(db, Collections.SYSTEM, DocNames.BLOCKED_DATES);
         await updateDoc(bd, {
             dates: arrayRemove(...remove_dates),
         });
