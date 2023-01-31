@@ -1,16 +1,51 @@
-import { Timestamp, doc, getFirestore, updateDoc, arrayUnion } from "firebase/firestore";
+import {
+    Timestamp,
+    collection,
+    doc,
+    getFirestore,
+    updateDoc,
+    arrayUnion,
+    writeBatch,
+    runTransaction,
+    arrayRemove,
+} from "firebase/firestore";
 
-import { Constants } from "./constants";
+import { Constants, DocNames } from "./constants";
 import { DateToString, DateDiff, IsEqual, UnblockDates, BlockDates } from "./utils";
 import { event_types, floor_options } from "./community_hall_rates";
 import { Collections } from "./constants";
 import { app } from "../config/firebase";
 
 class Booking {
+    static CODES = new Map([
+        ["marriage first_two", "MFT"],
+        ["marriage all", "MA"],
+        ["general ground", "GG"],
+        ["general first_two", "GFT"],
+        ["general all", "GA"],
+        ["funeral ground", "FG"],
+        ["funeral first_two", "FFT"],
+        ["funeral all", "FA"],
+    ]);
+
     static REJECTION_REASON_KEY = "rejection_reason";
 
-    constructor(user_id, is_block_member, start_date, end_date, event_type, floor_option, status, created_on = new Date(), modified_by = [], comments = {}, id = null) {
+    constructor(
+        user_id,
+        booking_reference_id,
+        is_block_member,
+        start_date,
+        end_date,
+        event_type,
+        floor_option,
+        status,
+        created_on = new Date(),
+        modified_by = [],
+        comments = {},
+        id = null
+    ) {
         this.user_id = user_id;
+        this.booking_reference_id = booking_reference_id;
         this.is_block_member = is_block_member;
         this.start_date = start_date;
         this.end_date = end_date;
@@ -88,6 +123,68 @@ class Booking {
         return f === this.floor_option;
     }
 
+    static async CreateDoc({
+        user_id,
+        is_block_member,
+        start_date,
+        end_date,
+        event_type,
+        floor_option,
+        status = Constants.STATUS_REQUEST,
+    }) {
+        const db = getFirestore(app);
+        try {
+            // TODO: Blocking of dates can be merged into a transaction/batched-write with other related operations
+            // Step 1: Block this range of dates in the system collection (this will also check whether they can be blocked)
+            const blocking_status = await BlockDates(start_date, end_date);
+            if (blocking_status) {
+                const booking_code_key = this.CODES.get(event_type + " " + floor_option);
+                const bookings_collection = collection(db, Collections.BOOKINGS);
+                const booking_request_ref = doc(bookings_collection).withConverter(this.FirestoreConverter);
+                const counters_ref = doc(db, Collections.SYSTEM, DocNames.COUNTERS);
+                const user_ref = doc(db, Collections.USERS, user_id);
+                await runTransaction(db, async transaction => {
+                    const counters_doc = await transaction.get(counters_ref);
+                    if (!counters_doc.exists()) {
+                        console.error("Counters document does not exist!");
+                        return;
+                    }
+
+                    // We need to obtain the latest counter value of each respective booking code ("MA", "MFT", etc)
+                    // and then increase it by 1. This value will be used as a part of the booking reference ID
+                    const counter = counters_doc.data()[booking_code_key] + 1;
+                    console.debug(counter);
+                    console.debug(typeof counter);
+                    transaction.update(counters_ref, { [booking_code_key]: counter });
+
+                    const booking_data = new Booking(
+                        user_id,
+                        "BOOK" + booking_code_key + counter.toString().padStart(5, "0"),
+                        is_block_member,
+                        start_date,
+                        end_date,
+                        event_type,
+                        floor_option,
+                        status
+                    );
+
+                    // Step 2: Create the booking request
+                    await transaction.set(booking_request_ref, booking_data);
+
+                    // Step 3: Add the booking request to the user's document
+                    await transaction.update(user_ref, { bookings: arrayUnion(booking_request_ref) });
+                });
+
+                return booking_request_ref.id;
+            }
+        } catch (err) {
+            await UnblockDates(start_date, end_date);
+            console.error(err);
+        }
+
+        return null;
+    }
+
     async UpdateDoc({ start_date, end_date, event_type, floor_option }) {
         if (this.id === null) {
             console.error("Cannot update document without ID");
@@ -134,6 +231,27 @@ class Booking {
         }
     }
 
+    async DeleteDoc() {
+        const start_date = this.start_date;
+        const end_date = this.end_date;
+        const db = getFirestore(app);
+        const booking_ref = doc(db, Collections.BOOKINGS, this.id);
+        const user_ref = doc(db, Collections.USERS, this.user_id);
+        const batch = writeBatch(db);
+
+        // Step 1: Remove booking reference from user's document
+        batch.update(user_ref, {
+            bookings: arrayRemove(booking_ref),
+        });
+
+        // Step 2: Delete the booking document
+        batch.delete(booking_ref);
+
+        await batch.commit();
+
+        UnblockDates(start_date, end_date);
+    }
+
     async SetBookingStatus(status, modifier_id, comments = "") {
         const db = getFirestore(app);
         const booking_requests_ref = doc(db, Collections.BOOKINGS, this.id);
@@ -158,6 +276,7 @@ class Booking {
         toFirestore: booking => {
             return {
                 user_id: booking.user_id,
+                booking_reference_id: booking.booking_reference_id,
                 is_block_member: booking.is_block_member,
                 start_date: Timestamp.fromDate(booking.start_date),
                 end_date: Timestamp.fromDate(booking.end_date),
@@ -165,7 +284,11 @@ class Booking {
                 floor_option: booking.floor_option,
                 status: booking.status,
                 created_on: Timestamp.fromDate(booking.created_on),
-                modified_by: booking.modified_by?.map(m => ({ modifier: m.modifier, status: m.status, timestamp: m.toDate() })),
+                modified_by: booking.modified_by?.map(m => ({
+                    modifier: m.modifier,
+                    status: m.status,
+                    timestamp: m.toDate(),
+                })),
                 comments: booking.comments,
             };
         },
@@ -174,6 +297,7 @@ class Booking {
             const data = snapshot.data(options);
             return new Booking(
                 data.user_id,
+                data.booking_reference_id,
                 data.is_block_member,
                 data.start_date.toDate(),
                 data.end_date.toDate(),

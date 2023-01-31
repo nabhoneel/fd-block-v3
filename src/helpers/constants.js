@@ -12,6 +12,7 @@ class Collections {
 
 class DocNames {
     static BLOCKED_DATES = "blocked_dates";
+    static COUNTERS = "counters";
 }
 
 export { Constants, Collections, DocNames };

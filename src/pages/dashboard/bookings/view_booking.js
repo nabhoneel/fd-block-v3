@@ -20,7 +20,7 @@ const Bookings = () => {
     const params = new URLSearchParams(location.search);
     const booking_id = params.get("id");
 
-    const { GetUserData, user_id } = useContext(StdContext);
+    const { GetUserData, NoData, user_id } = useContext(StdContext);
     const user_data = GetUserData();
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -44,6 +44,8 @@ const Bookings = () => {
         if (booking_obj !== null) return;
 
         const GetBookingDetails = async () => {
+            if (NoData()) return;
+
             const db = getFirestore(app);
             const booking_ref = doc(db, Collections.BOOKINGS, booking_id);
             const booking_doc = await getDoc(booking_ref.withConverter(Booking.FirestoreConverter));
@@ -56,8 +58,6 @@ const Bookings = () => {
                     return;
                 } else {
                     console.warn("Preventing unauthorized access");
-                    console.debug(user_data?.is_admin);
-                    console.debug(booking_data.user_id === user_id);
                     SetShowUnauthorizedAccess(true);
                     setTimeout(() => {
                         navigate(-1);
@@ -72,7 +72,7 @@ const Bookings = () => {
         };
 
         GetBookingDetails();
-    }, [user_data]);
+    }, [user_data, user_id]);
 
     const HandleEditBooking = () => {
         navigate(`/dashboard/bookings/edit_booking?id=${booking_obj.id}`);
@@ -80,18 +80,7 @@ const Bookings = () => {
 
     const HandleBookingDeletion = async () => {
         SetBookingDeletionInProgress(true);
-        const start_date = booking_obj.start_date;
-        const end_date = booking_obj.end_date;
-        const db = getFirestore(app);
-        const booking_ref = doc(db, Collections.BOOKINGS, booking_obj.id);
-        const user_ref = doc(db, Collections.USERS, booking_obj.user_id);
-        await updateDoc(user_ref, {
-            bookings: arrayRemove(booking_ref),
-        });
-
-        await deleteDoc(booking_ref);
-        UnblockDates(start_date, end_date);
-
+        await booking_obj.DeleteDoc();
         setTimeout(() => {
             SetBookingDeletionInProgress(false);
             SetShowDeleteConfirmation(false);
@@ -174,7 +163,9 @@ const Bookings = () => {
                                         </div>
                                         <div className="mx-10">
                                             <h3 className="text-lg">Booking status</h3>
-                                            <span className="text-base capitalize">{booking_obj.GetStatusString()}</span>
+                                            <span className="text-base capitalize">
+                                                {booking_obj.GetStatusString()}
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -216,7 +207,8 @@ const Bookings = () => {
                                                 </Button>
                                             </span>
                                         ) : null}
-                                        {(booking_obj.IsRequest() || booking_obj.IsConfirmed()) && booking_obj.user_id !== user_id ? (
+                                        {(booking_obj.IsRequest() || booking_obj.IsConfirmed()) &&
+                                        booking_obj.user_id !== user_id ? (
                                             <span className="">
                                                 <Button
                                                     color="failure"
@@ -248,7 +240,9 @@ const Bookings = () => {
                 <Modal.Body>
                     {booking_deletion_in_progress === false ? (
                         <div className="text-center">
-                            <h3 className="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">Confirm deleting this booking request</h3>
+                            <h3 className="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
+                                Confirm deleting this booking request
+                            </h3>
                             <div className="flex justify-center gap-4">
                                 <Button color="failure" onClick={HandleBookingDeletion}>
                                     Yes, I'm sure
@@ -284,7 +278,9 @@ const Bookings = () => {
                 <Modal.Body>
                     {booking_acceptance_in_progress === false ? (
                         <div className="text-center">
-                            <h3 className="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">Sure you want to accept this booking request?</h3>
+                            <h3 className="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
+                                Sure you want to accept this booking request?
+                            </h3>
                             <div className="flex justify-center gap-4">
                                 <Button color="success" onClick={HandleBookingAcceptance}>
                                     Yes, I'm sure
@@ -320,7 +316,9 @@ const Bookings = () => {
                 <Modal.Body>
                     {booking_rejection_in_progress === false ? (
                         <div className="text-center">
-                            <h3 className="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">Sure you want to cancel this booking request?</h3>
+                            <h3 className="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
+                                Sure you want to cancel this booking request?
+                            </h3>
                             <div className="flex flex-col">
                                 <div className="mb-5">
                                     <Textarea
@@ -335,7 +333,11 @@ const Bookings = () => {
                                     />
                                 </div>
                                 <div className="flex justify-center gap-4">
-                                    <Button color="failure" disabled={rejection_reason?.trim()?.length === 0} onClick={HandleBookingRejection}>
+                                    <Button
+                                        color="failure"
+                                        disabled={rejection_reason?.trim()?.length === 0}
+                                        onClick={HandleBookingRejection}
+                                    >
                                         Yes, cancel
                                     </Button>
                                     <Button

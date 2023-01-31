@@ -4,7 +4,6 @@ import { navigate } from "gatsby";
 import { Button, Modal, Card, Select, Spinner, Table } from "flowbite-react";
 
 // Firebase
-import { arrayUnion, getFirestore, collection, doc, setDoc, updateDoc } from "firebase/firestore";
 
 // Internal UI components
 import LoadingCenterSpinnner from "./loading-center";
@@ -13,10 +12,8 @@ import Datepicker from "./datepicker";
 // Internal data utils
 import { event_types, floor_options, cost_table } from "../helpers/community_hall_rates.js";
 import Booking from "../helpers/Booking";
-import { Constants, Collections } from "../helpers/constants";
-import { MoneyFormat, DateDiff, GetSetOfDates, UnblockDates, BlockDates } from "../helpers/utils";
+import { MoneyFormat, DateDiff, GetSetOfDates } from "../helpers/utils";
 import { StdContext } from "../context/StdContext";
-import { app } from "../config/firebase";
 
 const PriceSummary = ({ eventFloorUnitCost, refundableDepositCost, dateDiff, requestButtonAction }) => (
     <>
@@ -109,41 +106,22 @@ const EditBooking = ({ startDate = new Date(), endDate = new Date(), bookingObje
 
     const HandleProceed = async e => {
         SetRequestHandleInProcess(true);
-        const db = getFirestore(app);
-        const booking_requests_collection = collection(db, Collections.BOOKINGS);
-        const booking_request_ref = doc(booking_requests_collection).withConverter(Booking.FirestoreConverter);
-        const booking_data = editMode === true ? bookingObject : new Booking(user_id, user_data && user_data["isMember"] === true, start_date, end_date, event, floor, Constants.STATUS_REQUEST);
-
+        let booking_id = null ;
         try {
             if (editMode) {
-                bookingObject.UpdateDoc({ start_date: start_date, end_date: end_date, event_type: event, floor_option: floor });
+                await bookingObject.UpdateDoc({ start_date: start_date, end_date: end_date, event_type: event, floor_option: floor });
+                booking_id = bookingObject.id ;
             } else {
-                // Step 1: Block this range of dates in the system collection (this will also check whether they can be blocked)
-                const status = BlockDates(start_date, end_date);
-                if (status) {
-                    // Step 2: Create the booking request
-                    await setDoc(booking_request_ref, booking_data);
-
-                    // Step 3: Add the booking request to the user's document
-                    const user_doc = doc(db, Collections.USERS, user_id);
-                    await updateDoc(user_doc, {
-                        bookings: arrayUnion(booking_request_ref),
-                    });
-                }
+                booking_id = await Booking.CreateDoc({ user_id: user_id, is_block_member: user_data && user_data["isMember"] === true, start_date: start_date, end_date: end_date, event_type: event, floor_option: floor }) ;
             }
 
             setTimeout(() => {
                 SetRequestHandleInProcess(false);
                 SetShowModal(false);
-                const booking_id = booking_request_ref.id;
-                navigate(`/dashboard/bookings/view_booking?id=${booking_id}`);
+                if (booking_id) navigate(`/dashboard/bookings/view_booking?id=${booking_id}`);
+                else console.error('Could not create/update booking') ; // TODO: Create an alert
             }, 1000);
-        } catch (err) {
-            // TODO: Issue an alert
-            console.error("Could not create booking");
-            console.error(err);
-            UnblockDates(start_date, end_date);
-        }
+        } catch (err) {}
     };
     ////////////////////////////////////////////////////////////////////////////////
 

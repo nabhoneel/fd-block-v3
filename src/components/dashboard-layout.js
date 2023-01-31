@@ -41,7 +41,7 @@ export default function DashboardLayout({ children, enableBackgroundPattern = tr
                                             <span className="text-sm tracking-tight font-semibold text-slate-500 uppercase">Block Directory</span>
                                         </Sidebar.Item>
                                     </Sidebar.ItemGroup>
-                                    {user_data.is_admin ? (
+                                    {user_data?.is_admin ? (
                                         <Sidebar.ItemGroup>
                                             <Sidebar.Item href="/dashboard/admin/manage-bookings" icon={CgPullClear}>
                                                 <span className="text-sm tracking-tight font-semibold text-slate-500 uppercase">Manage Bookings</span>

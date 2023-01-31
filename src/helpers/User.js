@@ -1,15 +1,4 @@
-import {
-    Timestamp,
-    getFirestore,
-    collection,
-    doc,
-    setDoc,
-    getDoc,
-    getDocs,
-    query,
-    where,
-    writeBatch,
-} from "firebase/firestore";
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, where, writeBatch } from "firebase/firestore";
 
 import { app } from "../config/firebase";
 import { Collections } from "./constants";
