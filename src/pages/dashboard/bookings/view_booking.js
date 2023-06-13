@@ -1,20 +1,94 @@
 import React, { useState, useEffect, useContext } from "react";
 import { navigate } from "gatsby";
-import { Spinner, Card, Button, Modal, Alert, Textarea } from "flowbite-react";
+import { Table, Spinner, Card, Button, Modal, Alert, Textarea } from "flowbite-react";
 import { useLocation } from "@reach/router";
 
 import { getFirestore, doc, getDoc, updateDoc, deleteDoc, arrayRemove } from "firebase/firestore";
 
 import DashboardLayout from "../../../components/dashboard-layout";
+import { PriceSummary } from "../../../components/EditBooking";
 
 import { app } from "../../../config/firebase";
 import { StdContext } from "../../../context/StdContext";
 import { BlockDates, UnblockDates } from "../../../helpers/utils";
+import { cost_table } from "../../../helpers/community_hall_rates.js";
 import { Constants, Collections } from "../../../helpers/constants";
 import Booking from "../../../helpers/Booking";
 
 // TODO: Share the booking object via context. Use it by verifying proper details. Clear it at the proper time.
 // If it is not available, fetch and set it on the context
+
+const BookingDetails = ({ booking, display_user = false }) => {
+    const { GetUserData } = useContext(StdContext);
+    const user_data = GetUserData();
+    const resident = user_data && user_data["isMember"] === true ? "residents" : "non_residents";
+    const event = booking.GetEventType();
+    const floor = booking.GetFloorOption();
+    const event_floor_unit_cost = cost_table[resident][event][floor];
+    const refundable_deposit_cost = cost_table[resident][event]["security_deposit"];
+    const date_diff = booking.GetDuration();
+
+    return (
+        <div className="flex space-x-4">
+            <Table>
+                <Table.Body>
+                    <Table.Row>
+                        <Table.Cell>
+                            <div className="flex flex-col text-black">
+                                <span className="text-lg font-semibold">Booking date</span>
+                                <span className="text-base">{booking.GetStartDateString()}</span>
+                            </div>
+                            <hr className="my-3" />
+                            <div className="flex flex-col text-black">
+                                <span className="text-lg font-semibold">Duration</span>
+                                <span className="text-base">{booking.GetDuration()} days</span>
+                            </div>
+                            <hr className="my-3" />
+                            <div className="flex flex-col text-black">
+                                <span className="text-lg font-semibold">Purpose</span>
+                                <span className="text-base">{booking.GetEventString()}</span>
+                            </div>
+                            <hr className="my-3" />
+                            <div className="flex flex-col text-black">
+                                <span className="text-lg font-semibold">Number of floors booked</span>
+                                <span className="text-base">{booking.GetFloorOptionString()}</span>
+                            </div>
+                        </Table.Cell>
+                    </Table.Row>
+                </Table.Body>
+            </Table>
+            <div className="flex flex-col">
+                <Table>
+                    <Table.Body>
+                        <Table.Row>
+                            <Table.Cell>
+                                <div className="flex flex-col text-black">
+                                    <span className="text-lg font-semibold">Booking code</span>
+                                    <span className="text-base">{booking.GetBookingCode()}</span>
+                                </div>
+                            </Table.Cell>
+                            <Table.Cell>
+                                <div className="border-l-1 border-solid border-black h-2"></div>
+                                <div className="flex flex-col text-black">
+                                    <span className="text-lg font-semibold">Status</span>
+                                    <span className="text-base">{booking.GetStatusString()}</span>
+                                </div>
+                            </Table.Cell>
+                        </Table.Row>
+                    </Table.Body>
+                </Table>
+                <PriceSummary
+                    eventFloorUnitCost={event_floor_unit_cost}
+                    refundableDepositCost={refundable_deposit_cost}
+                    dateDiff={date_diff}
+                    show_heading={false}
+                    styles="text-base"
+                />
+            </div>
+        </div>
+    );
+};
+
 const Bookings = () => {
     const location = useLocation();
     const params = new URLSearchParams(location.search);
@@ -84,7 +158,8 @@ const Bookings = () => {
         setTimeout(() => {
             SetBookingDeletionInProgress(false);
             SetShowDeleteConfirmation(false);
-            navigate(-1);
+            console.debug("Deleted!");
+            navigate("/dashboard/bookings");
         }, 1000);
     };
 
@@ -133,42 +208,7 @@ const Bookings = () => {
                                     <Spinner size="xl" />
                                 </div>
                             ) : Object.keys(booking_obj).length === 0 ? null : (
-                                <div className="flex flex-col">
-                                    <div className="flex justify-start">
-                                        <div className="mr-10">
-                                            <h3 className="text-lg">User</h3>
-                                            <span className="text-base">{booking_obj.user_id}</span>
-                                        </div>
-                                        <div className="mr-10">
-                                            <h3 className="text-lg">Reference number</h3>
-                                            <span className="text-base">{booking_obj.id}</span>
-                                        </div>
-                                        <div className="mx-10">
-                                            <h3 className="text-lg">Date of booking</h3>
-                                            <span className="text-base">{booking_obj.GetStartDateString()}</span>
-                                        </div>
-                                        <div className="mx-10">
-                                            <h3 className="text-lg">Duration</h3>
-                                            <span className="text-base">{booking_obj.GetDuration()} days</span>
-                                        </div>
-                                    </div>
-                                    <div className="mt-5 flex justify-start">
-                                        <div className="mr-10">
-                                            <h3 className="text-lg">Purpose</h3>
-                                            <span className="text-base">{booking_obj.GetEventString()}</span>
-                                        </div>
-                                        <div className="mx-10">
-                                            <h3 className="text-lg">Number of floors booked</h3>
-                                            <span className="text-base">{booking_obj.GetFloorOptionString()}</span>
-                                        </div>
-                                        <div className="mx-10">
-                                            <h3 className="text-lg">Booking status</h3>
-                                            <span className="text-base capitalize">
-                                                {booking_obj.GetStatusString()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
+                                <BookingDetails booking={booking_obj} />
                             )}
                         </div>
                         <hr />

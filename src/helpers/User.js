@@ -1,10 +1,50 @@
-import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, where, writeBatch } from "firebase/firestore";
+import {
+    getFirestore,
+    collection,
+    doc,
+    setDoc,
+    getDoc,
+    getDocs,
+    query,
+    where,
+    writeBatch,
+    runTransaction,
+    arrayUnion,
+} from "firebase/firestore";
 
 import { app } from "../config/firebase";
-import { Collections } from "./constants";
+import { Constants, Collections, DocNames } from "./constants";
+
+/*
+ * * * * * * * * * * * * *
+ * User object structure *
+ * * * * * * * * * * * * *
+ *     id: user_id (string),
+ *     phone_number (tel-number),
+ *     email (string),
+ *     name (string),
+ *     is_member (boolean),
+ *     membership_status (boolean),
+ *     address: {
+ *         house_num: string
+ *         street_name: string,
+ *         city_name: string,
+ *         pin_code: number,
+ *         state: string,
+ *         country: string
+ *     },
+ *     bookings: [],
+ *     created_on: <Timestamp>
+ */
 
 class User {
     static LOCAL_STORAGE_USER_ITEM = "user_data";
+    static KEY_ID = "id";
+    static KEY_NAME = "name";
+    static KEY_EMAIL = "email";
+    static KEY_ADDRESS = "address";
+    static KEY_PHONE_NUM = "phone_number";
+    static KEY_IS_MEMBER = "is_member";
 
     static IsLocalStorageUpdated = user_id => {
         const local_data = localStorage.getItem(this.LOCAL_STORAGE_USER_ITEM);
@@ -16,13 +56,13 @@ class User {
         if (!user_data) return null;
 
         const user = {
-            name: user_data?.name,
-            phone_number: user_data?.phone_number,
-            address: user_data?.address,
-            is_member: user_data?.is_member,
-            membership_status: user_data?.membership_status,
-            created_on: user_data?.created_on,
-            id: user_data?.id,
+            name: user_data.name,
+            phone_number: user_data.phone_number,
+            address: user_data.address,
+            is_member: user_data.is_member,
+            membership_status: user_data.membership_status,
+            created_on: user_data.created_on,
+            id: user_data.id,
         };
 
         return user;
@@ -75,7 +115,7 @@ class User {
             const new_user = {
                 name: "",
                 phone_number: user_phone_number,
-                address: "" /* address */,
+                address: {},
                 is_member: false,
                 membership_status: false,
                 created_on: new Date(),
@@ -122,6 +162,7 @@ class User {
                 const batch = writeBatch(db);
                 const old_user_doc = doc(db, Collections.USERS, user_doc_id);
                 const new_user_doc = doc(db, Collections.USERS, user_id);
+                user_doc_data["id"] = user_id;
                 batch.set(new_user_doc, user_doc_data);
                 batch.delete(old_user_doc);
                 await batch.commit();
@@ -133,6 +174,36 @@ class User {
         }
 
         return {};
+    };
+
+    static Update = async (user_id, user_obj, verify_member_status = false) => {
+        const db = getFirestore(app);
+        const user_ref = doc(db, Collections.USERS, user_id);
+        try {
+            await runTransaction(db, async transaction => {
+                const user_doc = await transaction.get(user_ref);
+                if (!user_doc.exists()) {
+                    throw "User does not exist";
+                }
+
+                const user_data = user_doc.data();
+                if (
+                    verify_member_status &&
+                    user_obj[User.KEY_IS_MEMBER] &&
+                    user_doc[User.KEY_IS_MEMBER] === false &&
+                    user_doc[User.KEY_IS_MEMBER] === true
+                ) {
+                    user_obj[User.KEY_IS_MEMBER] = false; // The user will be marked as a member once an admin has verified
+                    const residency_requests_ref = doc(db, Collections.SYSTEM, DocNames.RESIDENCY_REQUESTS);
+                    await transaction.update(residency_requests_ref, { [Constants.DATA]: arrayUnion(user_ref) });
+                }
+
+                await transaction.update(user_ref, user_obj);
+            });
+        } catch (err) {
+            console.error("Could not update user data");
+            console.error(err);
+        }
     };
 }
 

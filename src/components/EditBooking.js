@@ -15,41 +15,57 @@ import Booking from "../helpers/Booking";
 import { MoneyFormat, DateDiff, GetSetOfDates } from "../helpers/utils";
 import { StdContext } from "../context/StdContext";
 
-const PriceSummary = ({ eventFloorUnitCost, refundableDepositCost, dateDiff, requestButtonAction }) => (
-    <>
-        <div className="mb-2 block mt-7">
-            <span className="text-xl">Summary</span>
-        </div>
-        <div className="mt-5">
-            <Table>
-                <Table.Body className="divide-y text-black text-sm">
-                    <Table.Row className="">
-                        <Table.Cell>Cost</Table.Cell>
-                        <Table.Cell>
-                            {MoneyFormat(eventFloorUnitCost)} &times; {dateDiff} day{dateDiff > 1 ? "s" : ""}
-                        </Table.Cell>
-                        <Table.Cell>{MoneyFormat(eventFloorUnitCost * dateDiff)}</Table.Cell>
-                    </Table.Row>
-                    <Table.Row className="">
-                        <Table.Cell>Refundable deposit</Table.Cell>
-                        <Table.Cell></Table.Cell>
-                        <Table.Cell>{MoneyFormat(refundableDepositCost)}</Table.Cell>
-                    </Table.Row>
-                    <Table.Row className="">
-                        <Table.Cell>Total</Table.Cell>
-                        <Table.Cell></Table.Cell>
-                        <Table.Cell>{MoneyFormat(eventFloorUnitCost * dateDiff + refundableDepositCost)}</Table.Cell>
-                    </Table.Row>
-                </Table.Body>
-            </Table>
-        </div>
-        <div className="mt-7 flex">
-            <div className="ml-auto">
-                <Button onClick={requestButtonAction}>Request to reserve</Button>
+const PriceSummary = ({
+    eventFloorUnitCost,
+    refundableDepositCost,
+    dateDiff,
+    requestButtonAction,
+    show_heading = true,
+    styles = null,
+}) => {
+    const style_props = styles ? styles : "";
+    return (
+        <>
+            {show_heading ? (
+                <div className="mb-2 block mt-7">
+                    <span className="text-xl">Summary</span>
+                </div>
+            ) : null}
+            <div className="mt-5">
+                <Table className={style_props}>
+                    <Table.Body className="divide-y text-black text-sm">
+                        <Table.Row className={style_props}>
+                            <Table.Cell className="font-semibold">Cost</Table.Cell>
+                            <Table.Cell>
+                                {MoneyFormat(eventFloorUnitCost)} &times; {dateDiff} day{dateDiff > 1 ? "s" : ""}
+                            </Table.Cell>
+                            <Table.Cell>{MoneyFormat(eventFloorUnitCost * dateDiff)}</Table.Cell>
+                        </Table.Row>
+                        <Table.Row className={style_props}>
+                            <Table.Cell className="font-semibold">Refundable deposit</Table.Cell>
+                            <Table.Cell></Table.Cell>
+                            <Table.Cell>{MoneyFormat(refundableDepositCost)}</Table.Cell>
+                        </Table.Row>
+                        <Table.Row className={style_props}>
+                            <Table.Cell className="font-semibold">Total</Table.Cell>
+                            <Table.Cell></Table.Cell>
+                            <Table.Cell>
+                                {MoneyFormat(eventFloorUnitCost * dateDiff + refundableDepositCost)}
+                            </Table.Cell>
+                        </Table.Row>
+                    </Table.Body>
+                </Table>
             </div>
-        </div>
-    </>
-);
+            {requestButtonAction ? (
+                <div className="mt-7 flex">
+                    <div className="ml-auto">
+                        <Button onClick={requestButtonAction}>Request to reserve</Button>
+                    </div>
+                </div>
+            ) : null}
+        </>
+    );
+};
 
 const EditBooking = ({ startDate = new Date(), endDate = new Date(), bookingObject = null, editMode = false }) => {
     const { NoData, SignedIn, GetUserData, user_id } = useContext(StdContext);
@@ -76,7 +92,9 @@ const EditBooking = ({ startDate = new Date(), endDate = new Date(), bookingObje
     const [start_date, SetStartDate] = useState(startDate);
     const [end_date, SetEndDate] = useState(endDate);
     const [event, SetEvent] = useState(bookingObject === null ? Object.keys(event_types)[0] : bookingObject.event_type);
-    const [floor, SetFloor] = useState(bookingObject === null ? Object.keys(floor_options[event])[0] : bookingObject.floor_option);
+    const [floor, SetFloor] = useState(
+        bookingObject === null ? Object.keys(floor_options[event])[0] : bookingObject.floor_option
+    );
     const [show_modal, SetShowModal] = useState(false);
     const [request_handle_in_process, SetRequestHandleInProcess] = useState(false);
 
@@ -106,20 +124,32 @@ const EditBooking = ({ startDate = new Date(), endDate = new Date(), bookingObje
 
     const HandleProceed = async e => {
         SetRequestHandleInProcess(true);
-        let booking_id = null ;
+        let booking_id = null;
         try {
             if (editMode) {
-                await bookingObject.UpdateDoc({ start_date: start_date, end_date: end_date, event_type: event, floor_option: floor });
-                booking_id = bookingObject.id ;
+                await bookingObject.UpdateDoc({
+                    start_date: start_date,
+                    end_date: end_date,
+                    event_type: event,
+                    floor_option: floor,
+                });
+                booking_id = bookingObject.id;
             } else {
-                booking_id = await Booking.CreateDoc({ user_id: user_id, is_block_member: user_data && user_data["isMember"] === true, start_date: start_date, end_date: end_date, event_type: event, floor_option: floor }) ;
+                booking_id = await Booking.CreateDoc({
+                    user_id: user_id,
+                    is_block_member: user_data && user_data["isMember"] === true,
+                    start_date: start_date,
+                    end_date: end_date,
+                    event_type: event,
+                    floor_option: floor,
+                });
             }
 
             setTimeout(() => {
                 SetRequestHandleInProcess(false);
                 SetShowModal(false);
                 if (booking_id) navigate(`/dashboard/bookings/view_booking?id=${booking_id}`);
-                else console.error('Could not create/update booking') ; // TODO: Create an alert
+                else console.error("Could not create/update booking"); // TODO: Create an alert
             }, 1000);
         } catch (err) {}
     };
@@ -160,7 +190,13 @@ const EditBooking = ({ startDate = new Date(), endDate = new Date(), bookingObje
                 {/***** End of calendar and billing details *****/}
                 <div className="flex justify-evenly">
                     <Suspense fallback={<Spinner color="success" aria-label="Success spinner example" />}>
-                        <Datepicker StartDate={start_date} SetStartDate={SetStartDate} EndDate={end_date} SetEndDate={SetEndDate} unblockedSetOfDates={unblock_dates} />
+                        <Datepicker
+                            StartDate={start_date}
+                            SetStartDate={SetStartDate}
+                            EndDate={end_date}
+                            SetEndDate={SetEndDate}
+                            unblockedSetOfDates={unblock_dates}
+                        />
                     </Suspense>
                     <div>
                         {/***** Event type dropdown menu *****/}
@@ -256,7 +292,9 @@ const EditBooking = ({ startDate = new Date(), endDate = new Date(), bookingObje
                 <Modal.Body>
                     {request_handle_in_process === false ? (
                         <div className="text-center">
-                            <h3 className="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">Confirm {editMode === true ? "changes to" : ""} this booking request?</h3>
+                            <h3 className="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
+                                Confirm {editMode === true ? "changes to" : ""} this booking request?
+                            </h3>
                             <div className="flex justify-center gap-4">
                                 <Button color="success" onClick={HandleProceed}>
                                     Yes, I'm sure
@@ -273,7 +311,9 @@ const EditBooking = ({ startDate = new Date(), endDate = new Date(), bookingObje
                         </div>
                     ) : (
                         <div className="flex flex-col text-center">
-                            <span className="mb-5 text-lg">{editMode === true ? "Updating" : "Creating"} booking request</span>
+                            <span className="mb-5 text-lg">
+                                {editMode === true ? "Updating" : "Creating"} booking request
+                            </span>
                             <Spinner size="xl" />
                         </div>
                     )}
@@ -282,7 +322,10 @@ const EditBooking = ({ startDate = new Date(), endDate = new Date(), bookingObje
                         <h5 className="text-base font-semibold mt-5 text-left">Note</h5>
                         <ul className="list-none text-sm mt-2 text-left">
                             <li>This request will be notified to the block committee.</li>
-                            <li>Once they approve this booking, payment options will be presented which when completed will confirm these dates to your name.</li>
+                            <li>
+                                Once they approve this booking, payment options will be presented which when completed
+                                will confirm these dates to your name.
+                            </li>
                         </ul>
                     </div>
                 </Modal.Body>
@@ -291,4 +334,5 @@ const EditBooking = ({ startDate = new Date(), endDate = new Date(), bookingObje
     );
 };
 
+export { PriceSummary };
 export default EditBooking;

@@ -51,14 +51,17 @@ export const StdContextProvider = ({ children }) => {
         return unsubscribe;
     });
 
-    const UpdateUserData = async () => {
-        if (!IsSignedIn() || user_data) return;
+    const UpdateUserData = async (force = false) => {
+        if (!force) {
+            // Try to get cached data and bail out
+            if (!IsSignedIn() || user_data) return;
 
-        if (!user_data && User.IsLocalStorageUpdated(user_id)) {
-            const local_data = User.RestoreFromLocalStorage();
-            if (local_data) {
-                SetUserData(local_data);
-                return;
+            if (!user_data && User.IsLocalStorageUpdated(user_id)) {
+                const local_data = User.RestoreFromLocalStorage();
+                if (local_data) {
+                    SetUserData(local_data);
+                    return;
+                }
             }
         }
 
@@ -106,6 +109,7 @@ export const StdContextProvider = ({ children }) => {
 
                 user_id,
                 user_phone_number,
+                UpdateUserData: UpdateUserData,
                 GetUserData: HandleGetUserData,
                 NoData: () => user_id === null,
                 SignedIn: IsSignedIn,

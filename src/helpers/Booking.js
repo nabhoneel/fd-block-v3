@@ -17,17 +17,6 @@ import { Collections } from "./constants";
 import { app } from "../config/firebase";
 
 class Booking {
-    static CODES = new Map([
-        ["marriage first_two", "MFT"],
-        ["marriage all", "MA"],
-        ["general ground", "GG"],
-        ["general first_two", "GFT"],
-        ["general all", "GA"],
-        ["funeral ground", "FG"],
-        ["funeral first_two", "FFT"],
-        ["funeral all", "FA"],
-    ]);
-
     static REJECTION_REASON_KEY = "rejection_reason";
 
     constructor(
@@ -56,6 +45,14 @@ class Booking {
         this.id = id;
         this.modified_by = modified_by;
         this.comments = comments;
+    }
+
+    GetEventType() {
+        return this.event_type;
+    }
+
+    GetFloorOption() {
+        return this.floor_option;
     }
 
     IsRequest() {
@@ -93,6 +90,10 @@ class Booking {
 
     GetFloorOptionString() {
         return floor_options[this.event_type][this.floor_option];
+    }
+
+    GetBookingCode() {
+        return this.booking_reference_id;
     }
 
     GetStatusString() {
@@ -138,7 +139,6 @@ class Booking {
             // Step 1: Block this range of dates in the system collection (this will also check whether they can be blocked)
             const blocking_status = await BlockDates(start_date, end_date);
             if (blocking_status) {
-                const booking_code_key = this.CODES.get(event_type + " " + floor_option);
                 const bookings_collection = collection(db, Collections.BOOKINGS);
                 const booking_request_ref = doc(bookings_collection).withConverter(this.FirestoreConverter);
                 const counters_ref = doc(db, Collections.SYSTEM, DocNames.COUNTERS);
@@ -152,14 +152,12 @@ class Booking {
 
                     // We need to obtain the latest counter value of each respective booking code ("MA", "MFT", etc)
                     // and then increase it by 1. This value will be used as a part of the booking reference ID
-                    const counter = counters_doc.data()[booking_code_key] + 1;
-                    console.debug(counter);
-                    console.debug(typeof counter);
-                    transaction.update(counters_ref, { [booking_code_key]: counter });
+                    const counter = counters_doc.data()["bookings"] + 1;
+                    transaction.update(counters_ref, { ["bookings"]: counter });
 
                     const booking_data = new Booking(
                         user_id,
-                        "BOOK" + booking_code_key + counter.toString().padStart(5, "0"),
+                        "BOOK" + counter.toString().padStart(5, "0"),
                         is_block_member,
                         start_date,
                         end_date,
@@ -199,8 +197,6 @@ class Booking {
             try {
                 await UnblockDates(this.start_date, this.end_date);
                 await BlockDates(start_date, end_date);
-                this.start_date = start_date;
-                this.end_date = end_date;
                 updates.start_date = start_date;
                 updates.end_date = end_date;
             } catch (err) {
@@ -211,20 +207,29 @@ class Booking {
         }
 
         if (!this.IsSameEvent(event_type)) {
-            this.event_type = event_type;
             updates.event_type = event_type;
         }
 
         if (!this.IsSameFloorOption(floor_option)) {
-            this.floor_option = floor_option;
             updates.floor_option = floor_option;
         }
 
         if (Object.keys(updates).length > 0) {
             console.warn("Updating document");
             const db = getFirestore(app);
-            const booking_requests_ref = doc(db, Collections.BOOKINGS, this.id);
-            await updateDoc(booking_requests_ref, updates);
+            try {
+                await runTransaction(db, async transaction => {
+                    const booking_requests_ref = doc(db, Collections.BOOKINGS, this.id);
+                    await transaction.update(booking_requests_ref, updates);
+                });
+
+                for (const key in Object.keys(updates)) {
+                    this[key] = updates[key];
+                }
+            } catch (err) {
+                console.error("Could not update booking");
+                console.error(err);
+            }
         } else {
             // TODO: Issue an alert
             console.info("Nothing needed to be updated");
